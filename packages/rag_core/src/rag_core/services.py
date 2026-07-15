@@ -56,8 +56,10 @@ class IngestionService:
         self.lock_manager = lock_manager
         self.local_lock = asyncio.Lock()
 
-    async def ingest_path(self, path: Path, force: bool = False) -> IngestionResult:
-        lock_name = f"ingest:{stable_id(str(path.resolve()))}"
+    async def ingest_path(
+        self, path: Path, force: bool = False, tenant_id: str = "default"
+    ) -> IngestionResult:
+        lock_name = f"ingest:{tenant_id}:{stable_id(str(path.resolve()))}"
         async with self.lock_manager.lock(
             lock_name,
             ttl_seconds=900,
@@ -66,7 +68,9 @@ class IngestionService:
             async with self.local_lock:
                 checkpoints = read_json(self.checkpoint_path, {})
             document = self.cleaner.clean(self.parser_registry.parse(path))
-            if not force and checkpoints.get(str(path.resolve())) == document.checksum:
+            document.document_id = stable_id(tenant_id, document.document_id)
+            document.metadata["tenant_id"] = tenant_id
+            if not force and checkpoints.get(f"{tenant_id}:{path.resolve()}") == document.checksum:
                 INGESTED_DOCUMENTS.labels(status="skipped").inc()
                 return IngestionResult(document.document_id, document.filename, 0, skipped=True)
             with STAGE_LATENCY.labels(stage="enrichment").time():
@@ -74,7 +78,7 @@ class IngestionService:
             asset_mapping: dict[str, str] = {}
             for asset in document.assets:
                 local_path = Path(asset.local_path)
-                object_name = f"{document.document_id}/{local_path.name}"
+                object_name = f"{tenant_id}/{document.document_id}/{local_path.name}"
                 asset.object_name = object_name
                 asset.public_url = await self.object_store.upload(local_path, object_name)
                 asset_mapping[asset.local_path] = asset.public_url
@@ -84,11 +88,11 @@ class IngestionService:
             with STAGE_LATENCY.labels(stage="embedding").time():
                 embeddings = await self.embedder.embed([chunk.embedding_text for chunk in chunks])
             await self.vector_store.ensure_schema(self.embedder.dimension)
-            await self.vector_store.delete_document(document.document_id)
+            await self.vector_store.delete_document(document.document_id, tenant_id)
             await self.vector_store.upsert(chunks, embeddings)
             async with self.local_lock:
                 checkpoints = read_json(self.checkpoint_path, {})
-                checkpoints[str(path.resolve())] = document.checksum
+                checkpoints[f"{tenant_id}:{path.resolve()}"] = document.checksum
                 atomic_json_write(self.checkpoint_path, checkpoints)
             INGESTED_DOCUMENTS.labels(status="success").inc()
             return IngestionResult(
@@ -99,7 +103,9 @@ class IngestionService:
                 output_docx=str(docx_path),
             )
 
-    async def ingest_directory(self, root: Path, force: bool = False) -> list[IngestionResult]:
+    async def ingest_directory(
+        self, root: Path, force: bool = False, tenant_id: str = "default"
+    ) -> list[IngestionResult]:
         paths = sorted(
             path
             for path in root.rglob("*")
@@ -107,7 +113,7 @@ class IngestionService:
         )
         results: list[IngestionResult] = []
         for path in paths:
-            results.append(await self.ingest_path(path, force=force))
+            results.append(await self.ingest_path(path, force=force, tenant_id=tenant_id))
         return results
 
 
@@ -151,9 +157,12 @@ class RagService:
         query: str,
         history: list[dict[str, str]],
         session_id: str | None = None,
+        tenant_id: str = "default",
+        user_id: str = "system",
     ) -> tuple[str, str, GeneratedAnswer]:
         actual_session_id = session_id or uuid.uuid4().hex
-        stored_history = await self.session_store.get_history(actual_session_id, limit=20)
+        scoped_session_id = f"{tenant_id}:{user_id}:{actual_session_id}"
+        stored_history = await self.session_store.get_history(scoped_session_id, limit=20)
         effective_history = history or stored_history
         timings: dict[str, float] = {}
 
@@ -172,7 +181,7 @@ class RagService:
             if hypothetical_answer:
                 variants.append(hypothetical_answer)
 
-        cache_key = f"rag:answer:{stable_id(rewritten, *variants)}"
+        cache_key = f"rag:answer:{tenant_id}:{stable_id(rewritten, *variants)}"
         cached = await self.cache.get_json(cache_key)
         contexts = []
         if isinstance(cached, dict):
@@ -185,7 +194,7 @@ class RagService:
         else:
             started = time.perf_counter()
             with STAGE_LATENCY.labels(stage="retrieval_rerank").time():
-                contexts = await self.retriever.retrieve(rewritten, variants)
+                contexts = await self.retriever.retrieve(rewritten, variants, tenant_id)
             timings["retrieval_rerank"] = _elapsed(started)
             started = time.perf_counter()
             with STAGE_LATENCY.labels(stage="generation").time():
@@ -225,32 +234,49 @@ class RagService:
             answer=generated.answer,
             retrieved_documents=retrieved_documents,
             timings_ms=generated.timings_ms,
+            tenant_id=tenant_id,
+            user_id=user_id,
         )
         await self.traces.save_message(trace)
         await self.session_store.append_message(
-            actual_session_id,
+            scoped_session_id,
             "user",
             query,
             self.session_ttl_seconds,
         )
         await self.session_store.append_message(
-            actual_session_id,
+            scoped_session_id,
             "assistant",
             generated.answer,
             self.session_ttl_seconds,
         )
         return message_id, actual_session_id, generated
 
-    async def get_session_history(self, session_id: str) -> list[dict[str, str]]:
-        return await self.session_store.get_history(session_id, limit=100)
+    async def get_session_history(
+        self, session_id: str, tenant_id: str = "default", user_id: str = "system"
+    ) -> list[dict[str, str]]:
+        return await self.session_store.get_history(
+            f"{tenant_id}:{user_id}:{session_id}", limit=100
+        )
 
-    async def clear_session(self, session_id: str) -> None:
-        await self.session_store.clear(session_id)
+    async def clear_session(
+        self, session_id: str, tenant_id: str = "default", user_id: str = "system"
+    ) -> None:
+        await self.session_store.clear(f"{tenant_id}:{user_id}:{session_id}")
 
-    async def feedback(self, message_id: str, value: int, reason: str = "") -> Feedback:
+    async def feedback(
+        self,
+        message_id: str,
+        value: int,
+        reason: str = "",
+        tenant_id: str = "default",
+        user_id: str = "system",
+    ) -> Feedback:
         if value not in (-1, 1):
             raise ValueError("feedback value must be -1 or 1")
-        feedback = Feedback(uuid.uuid4().hex, message_id, value, reason)
+        if await self.traces.get_message(message_id, tenant_id) is None:
+            raise KeyError(f"Message not found: {message_id}")
+        feedback = Feedback(uuid.uuid4().hex, message_id, value, reason, tenant_id, user_id)
         await self.traces.save_feedback(feedback)
         FEEDBACK_COUNT.labels(value=str(value)).inc()
         return feedback

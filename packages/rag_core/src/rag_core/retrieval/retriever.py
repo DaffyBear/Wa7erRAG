@@ -26,7 +26,7 @@ class ParentDocumentRetriever:
         self.rrf_k = rrf_k
 
     async def retrieve(
-        self, query: str, query_variants: Sequence[str] = ()
+        self, query: str, query_variants: Sequence[str] = (), tenant_id: str = "default"
     ) -> list[RetrievalResult]:
         search_texts = _unique_non_empty([query, *query_variants])
         embeddings = await self.embedder.embed(search_texts)
@@ -37,7 +37,7 @@ class ParentDocumentRetriever:
         for route_index, (_search_text, embedding) in enumerate(
             zip(search_texts, embeddings, strict=True)
         ):
-            hits = await self.vector_store.search(embedding, self.vector_top_k)
+            hits = await self.vector_store.search(embedding, self.vector_top_k, tenant_id)
             route_name = "query" if route_index == 0 else f"variant_{route_index}"
             for rank, hit in enumerate(hits, start=1):
                 document_id = hit.chunk.document_id
@@ -49,7 +49,7 @@ class ParentDocumentRetriever:
                 matched_routes[document_id].add(route_name)
 
         document_ids = sorted(fused_scores, key=fused_scores.get, reverse=True)
-        chunks = await self.vector_store.get_document_chunks(document_ids)
+        chunks = await self.vector_store.get_document_chunks(document_ids, tenant_id)
         grouped = defaultdict(list)
         for chunk in chunks:
             grouped[chunk.document_id].append(chunk)

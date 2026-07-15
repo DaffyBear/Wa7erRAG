@@ -22,6 +22,17 @@
 
 
 
+## Python Environment
+
+Use the Conda environment `RAG_E`, then install dependencies and start services with:
+
+```bat
+scripts\create_env.cmd
+scripts\install_dev.cmd
+scripts\run_api.cmd
+scripts\run_web.cmd
+```
+
 ## Mock 模式
 
 `.env` 中设置 `RAG_USE_MOCKS=true` 时，无需安装 Milvus、PostgreSQL、Redis、MinIO 或 GPU 模型服务即可运行完整链路。

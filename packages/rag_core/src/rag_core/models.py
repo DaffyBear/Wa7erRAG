@@ -103,6 +103,8 @@ class MessageTrace:
     answer: str
     retrieved_documents: list[dict[str, Any]]
     timings_ms: dict[str, float]
+    tenant_id: str = "default"
+    user_id: str = "system"
     created_at: datetime = field(default_factory=utc_now)
 
 
@@ -112,4 +114,6 @@ class Feedback:
     message_id: str
     value: int
     reason: str = ""
+    tenant_id: str = "default"
+    user_id: str = "system"
     created_at: datetime = field(default_factory=utc_now)

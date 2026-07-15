@@ -39,6 +39,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Docker local client state
+.docker-config/
+
 # IDE and OS
 .idea/
 .vscode/

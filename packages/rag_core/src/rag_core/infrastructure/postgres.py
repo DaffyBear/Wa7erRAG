@@ -18,6 +18,8 @@ class MessageRecord(Base):
     __tablename__ = "messages"
     message_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, default="default")
+    user_id: Mapped[str] = mapped_column(String(64), index=True, default="system")
     query: Mapped[str] = mapped_column(Text)
     rewritten_query: Mapped[str] = mapped_column(Text)
     answer: Mapped[str] = mapped_column(Text)
@@ -31,6 +33,8 @@ class FeedbackRecord(Base):
     feedback_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     message_id: Mapped[str] = mapped_column(String(64), index=True)
     value: Mapped[int] = mapped_column(Integer)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, default="default")
+    user_id: Mapped[str] = mapped_column(String(64), index=True, default="system")
     reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -54,20 +58,24 @@ class PostgresTraceRepository:
             await session.merge(FeedbackRecord(**asdict(feedback)))
             await session.commit()
 
-    async def get_message(self, message_id: str) -> MessageTrace | None:
+    async def get_message(self, message_id: str, tenant_id: str = "default") -> MessageTrace | None:
         async with self.sessions() as session:
             record = await session.scalar(
-                select(MessageRecord).where(MessageRecord.message_id == message_id)
+                select(MessageRecord).where(
+                    MessageRecord.message_id == message_id, MessageRecord.tenant_id == tenant_id
+                )
             )
         if record is None:
             return None
         return MessageTrace(
-            record.message_id,
-            record.session_id,
-            record.query,
-            record.rewritten_query,
-            record.answer,
-            record.retrieved_documents,
-            record.timings_ms,
-            record.created_at,
+            message_id=record.message_id,
+            session_id=record.session_id,
+            query=record.query,
+            rewritten_query=record.rewritten_query,
+            answer=record.answer,
+            retrieved_documents=record.retrieved_documents,
+            timings_ms=record.timings_ms,
+            tenant_id=record.tenant_id,
+            user_id=record.user_id,
+            created_at=record.created_at,
         )

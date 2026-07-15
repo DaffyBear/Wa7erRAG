@@ -30,28 +30,45 @@ class InMemoryVectorStore:
                 raise ValueError(f"Embedding dimension mismatch, expected {self.dimension}")
             self.records[chunk.chunk_id] = (chunk, list(embedding))
 
-    async def delete_document(self, document_id: str) -> None:
+    async def delete_document(self, document_id: str, tenant_id: str = "default") -> None:
         for chunk_id in [
-            key for key, value in self.records.items() if value[0].document_id == document_id
+            key
+            for key, value in self.records.items()
+            if value[0].document_id == document_id
+            and value[0].metadata.get("tenant_id", "default") == tenant_id
         ]:
             del self.records[chunk_id]
 
-    async def search(self, embedding: Sequence[float], limit: int) -> list[VectorHit]:
+    async def search(
+        self, embedding: Sequence[float], limit: int, tenant_id: str = "default"
+    ) -> list[VectorHit]:
         if self.dimension is None or len(embedding) != self.dimension:
             raise ValueError("Query embedding dimension does not match vector schema")
         hits = [
             VectorHit(chunk=chunk, score=_cosine(embedding, vector))
             for chunk, vector in self.records.values()
+            if chunk.metadata.get("tenant_id", "default") == tenant_id
         ]
         return sorted(hits, key=lambda hit: hit.score, reverse=True)[:limit]
 
-    async def get_document_chunks(self, document_ids: Sequence[str]) -> list[DocumentChunk]:
+    async def get_document_chunks(
+        self, document_ids: Sequence[str], tenant_id: str = "default"
+    ) -> list[DocumentChunk]:
         wanted = set(document_ids)
-        chunks = [chunk for chunk, _ in self.records.values() if chunk.document_id in wanted]
+        chunks = [
+            chunk
+            for chunk, _ in self.records.values()
+            if chunk.document_id in wanted
+            and chunk.metadata.get("tenant_id", "default") == tenant_id
+        ]
         return sorted(chunks, key=lambda chunk: (chunk.document_id, chunk.chunk_index))
 
-    async def count(self) -> int:
-        return len(self.records)
+    async def count(self, tenant_id: str = "default") -> int:
+        return sum(
+            1
+            for chunk, _ in self.records.values()
+            if chunk.metadata.get("tenant_id", "default") == tenant_id
+        )
 
 
 class InMemoryTraceRepository:
@@ -63,12 +80,16 @@ class InMemoryTraceRepository:
         self.messages[trace.message_id] = trace
 
     async def save_feedback(self, feedback: Feedback) -> None:
-        if feedback.message_id not in self.messages:
+        if (
+            feedback.message_id not in self.messages
+            or self.messages[feedback.message_id].tenant_id != feedback.tenant_id
+        ):
             raise KeyError(f"Message not found: {feedback.message_id}")
         self.feedback[feedback.feedback_id] = feedback
 
-    async def get_message(self, message_id: str) -> MessageTrace | None:
-        return self.messages.get(message_id)
+    async def get_message(self, message_id: str, tenant_id: str = "default") -> MessageTrace | None:
+        trace = self.messages.get(message_id)
+        return trace if trace and trace.tenant_id == tenant_id else None
 
 
 def _cosine(left: Sequence[float], right: Sequence[float]) -> float:

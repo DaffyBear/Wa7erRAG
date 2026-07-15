@@ -10,6 +10,7 @@ def test_chat_rate_limit_and_session_endpoints(tmp_path: Path) -> None:
     settings = get_settings()
     original_limit = settings.rag_chat_rate_limit
     settings.rag_chat_rate_limit = 2
+    get_container.cache_clear()
     container = get_container()
     source = tmp_path / "guide.md"
     source.write_text("# MQTT\n\n默认端口是1883。", encoding="utf-8")
@@ -17,8 +18,20 @@ def test_chat_rate_limit_and_session_endpoints(tmp_path: Path) -> None:
     with TestClient(app) as client:
         import asyncio
 
-        asyncio.run(container.ingestion.ingest_path(source, force=True))
-        headers = {"x-user-id": "rate-test-user"}
+        bootstrap = client.post(
+            "/api/v1/security/bootstrap",
+            headers={"x-bootstrap-token": settings.security_bootstrap_token},
+            json={
+                "username": "rate-test-user",
+                "password": "StrongPassword123!",
+                "tenant_name": "Rate Tenant",
+                "tenant_slug": "rate-tenant",
+            },
+        )
+        assert bootstrap.status_code == 201, bootstrap.text
+        headers = {"authorization": f"Bearer {bootstrap.json()['access_token']}"}
+        tenant_id = bootstrap.json()["tenant_id"]
+        asyncio.run(container.ingestion.ingest_path(source, force=True, tenant_id=tenant_id))
         first = client.post("/api/v1/chat", json={"query": "MQTT端口？"}, headers=headers)
         second = client.post("/api/v1/chat", json={"query": "MQTT端口？"}, headers=headers)
         third = client.post("/api/v1/chat", json={"query": "MQTT端口？"}, headers=headers)
@@ -28,11 +41,15 @@ def test_chat_rate_limit_and_session_endpoints(tmp_path: Path) -> None:
         assert "retry-after" in third.headers
 
         session_id = first.json()["session_id"]
-        history = client.get(f"/api/v1/chat/sessions/{session_id}")
+        history = client.get(f"/api/v1/chat/sessions/{session_id}", headers=headers)
         assert history.status_code == 200
         assert len(history.json()["history"]) == 2
-        cleared = client.delete(f"/api/v1/chat/sessions/{session_id}")
+        cleared = client.delete(f"/api/v1/chat/sessions/{session_id}", headers=headers)
         assert cleared.status_code == 204
-        assert client.get(f"/api/v1/chat/sessions/{session_id}").json()["history"] == []
+        assert (
+            client.get(f"/api/v1/chat/sessions/{session_id}", headers=headers).json()["history"]
+            == []
+        )
 
     settings.rag_chat_rate_limit = original_limit
+    get_container.cache_clear()

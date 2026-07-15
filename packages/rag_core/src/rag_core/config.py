@@ -12,6 +12,15 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_debug: bool = True
     log_level: str = "INFO"
+    security_enabled: bool = True
+    security_jwt_secret: str = "development-only-change-this-secret-32chars"
+    security_jwt_issuer: str = "wa7errag"
+    security_jwt_audience: str = "wa7errag-api"
+    security_access_token_ttl_seconds: int = 3600
+    security_login_rate_limit: int = 10
+    security_login_rate_window_seconds: int = 300
+    security_bootstrap_token: str = "change-me-bootstrap-token"
+    security_asset_signing_secret: str = "development-only-asset-signing-secret"
     rag_use_mocks: bool = True
     rag_embedding_model: str = "Qwen3-Embedding-8B"
     rag_embedding_dimension: int = 1024
@@ -36,7 +45,7 @@ class Settings(BaseSettings):
     model_gateway_api_key: str = "change-me"
     rerank_endpoint: str = "http://localhost:9010/rerank"
     milvus_uri: str = "http://localhost:19530"
-    milvus_collection: str = "enterprise_knowledge"
+    milvus_collection: str = "enterprise_knowledge_tenant_v1"
     postgres_dsn: str = "postgresql+asyncpg://rag:rag@localhost:5432/rag"
     redis_url: str = "redis://localhost:6379/0"
     minio_endpoint: str = "localhost:9001"

@@ -15,6 +15,7 @@ class MilvusVectorStore:
         hnsw_m: int = 16,
         ef_construction: int = 256,
         ef_search: int = 64,
+        consistency_level: str = "Strong",
     ) -> None:
         from pymilvus import MilvusClient
 
@@ -23,6 +24,7 @@ class MilvusVectorStore:
         self.hnsw_m = hnsw_m
         self.ef_construction = ef_construction
         self.ef_search = ef_search
+        self.consistency_level = consistency_level
         self.dimension: int | None = None
 
     async def ensure_schema(self, embedding_dimension: int) -> None:
@@ -33,6 +35,14 @@ class MilvusVectorStore:
 
         if self.client.has_collection(self.collection_name):
             description = self.client.describe_collection(self.collection_name)
+            field_names = {field["name"] for field in description["fields"]}
+            required_fields = {"embedding", "tenant_id", "document_id", "chunk_id"}
+            missing_fields = required_fields - field_names
+            if missing_fields:
+                raise ValueError(
+                    f"Milvus collection is missing required fields: {sorted(missing_fields)}; "
+                    "rebuild the collection explicitly"
+                )
             vector_field = next(
                 field for field in description["fields"] if field["name"] == "embedding"
             )
@@ -44,11 +54,13 @@ class MilvusVectorStore:
                     "rebuild the collection explicitly"
                 )
             self.dimension = existing_dimension
+            self.client.load_collection(self.collection_name)
             return
         schema = MilvusClient.create_schema(auto_id=True, enable_dynamic_field=False)
         schema.add_field("id", DataType.INT64, is_primary=True, auto_id=True)
         schema.add_field("chunk_id", DataType.VARCHAR, max_length=64)
         schema.add_field("document_id", DataType.VARCHAR, max_length=64)
+        schema.add_field("tenant_id", DataType.VARCHAR, max_length=64)
         schema.add_field("filename", DataType.VARCHAR, max_length=512)
         schema.add_field("chunk_index", DataType.INT64)
         schema.add_field("content", DataType.VARCHAR, max_length=65535)
@@ -63,10 +75,12 @@ class MilvusVectorStore:
             params={"M": self.hnsw_m, "efConstruction": self.ef_construction},
         )
         index_params.add_index(field_name="document_id", index_type="INVERTED")
+        index_params.add_index(field_name="tenant_id", index_type="INVERTED")
         index_params.add_index(field_name="filename", index_type="INVERTED")
         self.client.create_collection(
             self.collection_name, schema=schema, index_params=index_params
         )
+        self.client.load_collection(self.collection_name)
         self.dimension = embedding_dimension
 
     async def upsert(
@@ -78,6 +92,7 @@ class MilvusVectorStore:
             {
                 "chunk_id": chunk.chunk_id,
                 "document_id": chunk.document_id,
+                "tenant_id": str(chunk.metadata.get("tenant_id", "default")),
                 "filename": chunk.filename,
                 "chunk_index": chunk.chunk_index,
                 "content": chunk.content,
@@ -89,20 +104,26 @@ class MilvusVectorStore:
         ]
         await asyncio.to_thread(self.client.insert, self.collection_name, rows)
 
-    async def delete_document(self, document_id: str) -> None:
+    async def delete_document(self, document_id: str, tenant_id: str = "default") -> None:
         escaped = document_id.replace('"', '\\"')
         await asyncio.to_thread(
-            self.client.delete, self.collection_name, filter=f'document_id == "{escaped}"'
+            self.client.delete,
+            self.collection_name,
+            filter=f'document_id == "{escaped}" and tenant_id == "{tenant_id}"',
         )
 
-    async def search(self, embedding: Sequence[float], limit: int) -> list[VectorHit]:
+    async def search(
+        self, embedding: Sequence[float], limit: int, tenant_id: str = "default"
+    ) -> list[VectorHit]:
         result = await asyncio.to_thread(
             self.client.search,
             self.collection_name,
             data=[list(embedding)],
             anns_field="embedding",
+            filter=f'tenant_id == "{tenant_id}"',
             limit=limit,
             search_params={"metric_type": "COSINE", "params": {"ef": self.ef_search}},
+            consistency_level=self.consistency_level,
             output_fields=[
                 "chunk_id",
                 "document_id",
@@ -117,14 +138,16 @@ class MilvusVectorStore:
             VectorHit(_row_to_chunk(item["entity"]), float(item["distance"])) for item in result[0]
         ]
 
-    async def get_document_chunks(self, document_ids: Sequence[str]) -> list[DocumentChunk]:
+    async def get_document_chunks(
+        self, document_ids: Sequence[str], tenant_id: str = "default"
+    ) -> list[DocumentChunk]:
         if not document_ids:
             return []
         quoted = ", ".join(f'"{item.replace(chr(34), chr(92) + chr(34))}"' for item in document_ids)
         rows = await asyncio.to_thread(
             self.client.query,
             self.collection_name,
-            filter=f"document_id in [{quoted}]",
+            filter=f'document_id in [{quoted}] and tenant_id == "{tenant_id}"',
             output_fields=[
                 "chunk_id",
                 "document_id",
@@ -135,15 +158,20 @@ class MilvusVectorStore:
                 "metadata_json",
             ],
             limit=16384,
+            consistency_level=self.consistency_level,
         )
         return sorted(
             (_row_to_chunk(row) for row in rows),
             key=lambda chunk: (chunk.document_id, chunk.chunk_index),
         )
 
-    async def count(self) -> int:
+    async def count(self, tenant_id: str = "default") -> int:
         rows = await asyncio.to_thread(
-            self.client.query, self.collection_name, filter="id >= 0", output_fields=["count(*)"]
+            self.client.query,
+            self.collection_name,
+            filter=f'id >= 0 and tenant_id == "{tenant_id}"',
+            output_fields=["count(*)"],
+            consistency_level=self.consistency_level,
         )
         return int(rows[0].get("count(*)", 0)) if rows else 0
 

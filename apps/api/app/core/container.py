@@ -12,11 +12,13 @@ from rag_core.governance import DataGovernanceService
 from rag_core.infrastructure import (
     HttpReranker,
     InMemoryCache,
+    InMemorySecurityRepository,
     InMemoryTraceRepository,
     InMemoryVectorStore,
     LocalObjectStore,
     MilvusVectorStore,
     MinioObjectStore,
+    PostgresSecurityRepository,
     PostgresTraceRepository,
     RedisCache,
     RedisStateBackend,
@@ -33,6 +35,8 @@ from rag_core.retrieval import (
     OpenAICompatibleHydeGenerator,
     OpenAICompatibleQueryRewriter,
 )
+from rag_core.security import JwtCodec
+from rag_core.security_service import SecurityService
 from rag_core.services import IngestionService, RagService
 
 
@@ -41,11 +45,13 @@ class Container:
     ingestion: IngestionService
     rag: RagService
     vector_store: object
+    object_store: object
     traces: object
     sessions: object
     locks: object
     rate_limiter: object
     governance: DataGovernanceService
+    security: SecurityService
     redis_backend: object | None = None
 
 
@@ -66,7 +72,10 @@ def get_container() -> Container:
         enricher = HeuristicMetadataEnricher()
         embedder = DeterministicHashEmbedder(settings.rag_embedding_dimension)
         vector_store = InMemoryVectorStore()
-        object_store = LocalObjectStore(settings.data_asset_dir / "public")
+        object_store = LocalObjectStore(
+            settings.data_asset_dir / "public",
+            signing_secret=settings.security_asset_signing_secret,
+        )
         rewriter = HeuristicQueryRewriter()
         hyde_generator = HeuristicHydeGenerator()
         reranker = LexicalReranker()
@@ -76,6 +85,7 @@ def get_container() -> Container:
         sessions = InMemorySessionStore()
         locks = InMemoryLockManager()
         rate_limiter = InMemoryRateLimiter()
+        security_repository = InMemorySecurityRepository()
     else:
         redis_backend = RedisStateBackend(settings.redis_url)
         enricher = OpenAICompatibleMetadataEnricher(
@@ -104,6 +114,7 @@ def get_container() -> Container:
             settings.minio_secret_key,
             settings.minio_bucket,
             settings.minio_secure,
+            signing_secret=settings.security_asset_signing_secret,
         )
         rewriter = OpenAICompatibleQueryRewriter(
             settings.model_gateway_base_url,
@@ -127,7 +138,17 @@ def get_container() -> Container:
         sessions = redis_backend.sessions
         locks = redis_backend.locks
         rate_limiter = redis_backend.rate_limiter
+        security_repository = PostgresSecurityRepository(settings.postgres_dsn)
 
+    security = SecurityService(
+        security_repository,
+        JwtCodec(
+            settings.security_jwt_secret,
+            settings.security_jwt_issuer,
+            settings.security_jwt_audience,
+            settings.security_access_token_ttl_seconds,
+        ),
+    )
     governance = DataGovernanceService(
         parser_registry,
         cleaner,
@@ -165,10 +186,12 @@ def get_container() -> Container:
         ingestion=ingestion,
         rag=rag,
         vector_store=vector_store,
+        object_store=object_store,
         traces=traces,
         sessions=sessions,
         locks=locks,
         rate_limiter=rate_limiter,
         governance=governance,
+        security=security,
         redis_backend=redis_backend,
     )

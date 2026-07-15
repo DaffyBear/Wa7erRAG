@@ -31,9 +31,10 @@ class DataGovernanceService:
         sample_size: int = 50,
         seed: int = 2026,
         include_failures: bool = True,
+        tenant_id: str = "default",
     ) -> GovernanceRun:
         run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
-        run_dir = self.reports_root / run_id
+        run_dir = self._run_dir(tenant_id, run_id)
         inventory_dir = run_dir / "inventory"
         review_dir = run_dir / "review"
         diff_dir = run_dir / "cleaning_diff"
@@ -82,12 +83,14 @@ class DataGovernanceService:
             artifacts=artifacts,
         )
         self._write_manifest(run_dir, run)
-        self._update_latest(run_dir)
+        self._update_latest(run_dir, tenant_id)
         return run
 
-    def import_review_results(self, run_id: str, review_csv: Path) -> GovernanceRun:
-        run_dir = self.reports_root / run_id
-        run = self.load_run(run_id)
+    def import_review_results(
+        self, run_id: str, review_csv: Path, tenant_id: str = "default"
+    ) -> GovernanceRun:
+        run_dir = self._run_dir(tenant_id, run_id)
+        run = self.load_run(run_id, tenant_id)
         samples_path = Path(run.artifacts["review_samples_json"])
         samples = [
             SampleRecord(**item) for item in json.loads(samples_path.read_text(encoding="utf-8"))
@@ -118,9 +121,11 @@ class DataGovernanceService:
         self._write_manifest(run_dir, run)
         return run
 
-    def compare_runs(self, baseline_run_id: str, current_run_id: str) -> Path:
-        baseline = self.load_run(baseline_run_id)
-        current = self.load_run(current_run_id)
+    def compare_runs(
+        self, baseline_run_id: str, current_run_id: str, tenant_id: str = "default"
+    ) -> Path:
+        baseline = self.load_run(baseline_run_id, tenant_id)
+        current = self.load_run(current_run_id, tenant_id)
         baseline_summary = json.loads(
             Path(baseline.artifacts["inventory_summary_json"]).read_text(encoding="utf-8")
         )
@@ -174,19 +179,22 @@ class DataGovernanceService:
                 ]
             },
         }
-        output = self.reports_root / current_run_id / f"comparison_vs_{baseline_run_id}.json"
+        output = (
+            self._tenant_root(tenant_id) / current_run_id / f"comparison_vs_{baseline_run_id}.json"
+        )
         output.write_text(json.dumps(comparison, ensure_ascii=False, indent=2), encoding="utf-8")
         return output
 
-    def load_run(self, run_id: str) -> GovernanceRun:
-        manifest = self.reports_root / run_id / "run_manifest.json"
+    def load_run(self, run_id: str, tenant_id: str = "default") -> GovernanceRun:
+        manifest = self._run_dir(tenant_id, run_id) / "run_manifest.json"
         return GovernanceRun(**json.loads(manifest.read_text(encoding="utf-8")))
 
-    def list_runs(self) -> list[GovernanceRun]:
+    def list_runs(self, tenant_id: str = "default") -> list[GovernanceRun]:
         runs = []
-        if not self.reports_root.exists():
+        reports_root = self._tenant_root(tenant_id)
+        if not reports_root.exists():
             return runs
-        for manifest in sorted(self.reports_root.glob("*/run_manifest.json"), reverse=True):
+        for manifest in sorted(reports_root.glob("*/run_manifest.json"), reverse=True):
             runs.append(GovernanceRun(**json.loads(manifest.read_text(encoding="utf-8"))))
         return runs
 
@@ -202,8 +210,27 @@ class DataGovernanceService:
         run.artifacts["manifest"] = str(manifest)
         manifest.write_text(json.dumps(asdict(run), ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def _update_latest(self, run_dir: Path) -> None:
-        latest = self.reports_root / "latest.txt"
+    def tenant_reports_root(self, tenant_id: str) -> Path:
+        return self._tenant_root(tenant_id)
+
+    def _run_dir(self, tenant_id: str, run_id: str) -> Path:
+        safe_run_id = "".join(
+            character for character in run_id if character.isalnum() or character in "-_"
+        )
+        if not safe_run_id or safe_run_id != run_id:
+            raise ValueError("Invalid governance run id")
+        return self._tenant_root(tenant_id) / safe_run_id
+
+    def _tenant_root(self, tenant_id: str) -> Path:
+        safe_tenant = "".join(
+            character for character in tenant_id if character.isalnum() or character in "-_"
+        )
+        if not safe_tenant or safe_tenant != tenant_id:
+            raise ValueError("Invalid tenant id")
+        return self.reports_root / safe_tenant
+
+    def _update_latest(self, run_dir: Path, tenant_id: str = "default") -> None:
+        latest = self._tenant_root(tenant_id) / "latest.txt"
         latest.parent.mkdir(parents=True, exist_ok=True)
         latest.write_text(run_dir.name, encoding="utf-8")
 

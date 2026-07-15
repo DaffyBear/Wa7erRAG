@@ -1,0 +1,31 @@
+embedding:
+  model: Qwen3-Embedding-8B
+  dimension: 1024
+generation:
+  model: Qwen2.5-72B
+rewrite:
+  model: Qwen2.5-7B-Instruct
+chunking:
+  short_document_limit: 6000
+  chunk_size: 6000
+  overlap: 500
+retrieval:
+  vector_top_k: 20
+  final_top_k: 5
+  parent_document_expansion: true
+  hyde_enabled: true
+rerank:
+  model: bge-reranker-v2-m3
+  candidate_count: 20
+milvus:
+  index_type: HNSW
+  metric_type: COSINE
+  m: 16
+  ef_construction: 256
+  ef_search: 64
+
+redis_state:
+  session_ttl_seconds: 86400
+  chat_rate_limit: 30
+  upload_rate_limit: 10
+  rate_window_seconds: 60

@@ -1,0 +1,27 @@
+:root { color-scheme: dark; font-family: Inter, "Microsoft YaHei", system-ui, sans-serif; background: #07101c; color: #eef4ff; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 20% 0, #173455 0, #07101c 42%); }
+button, textarea { font: inherit; }
+main { width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.eyebrow { margin: 0; color: #61ddc7; letter-spacing: .18em; font-size: 11px; font-weight: 800; }
+h1 { margin: 8px 0 0; font-size: clamp(28px, 5vw, 48px); }
+.upload { cursor: pointer; padding: 11px 16px; border: 1px solid #426384; border-radius: 12px; color: #cfe1f5; background: #10243a; }
+.upload input { display: none; }
+.chat { min-height: 62vh; padding: 22px; border: 1px solid #263f5c; border-radius: 24px; background: rgba(6, 18, 32, .74); overflow: auto; }
+.empty { display: grid; min-height: 52vh; place-content: center; text-align: center; color: #91a6bd; }
+.empty h2 { color: #eef4ff; }
+article { max-width: 86%; margin: 16px 0; padding: 18px; border-radius: 18px; white-space: pre-wrap; line-height: 1.75; }
+article.user { margin-left: auto; background: #1d5b67; }
+article.assistant { background: #10253d; border: 1px solid #284764; }
+.role { margin-bottom: 8px; color: #65d6c3; font-size: 12px; font-weight: 800; }
+.rewrite { margin-bottom: 12px; padding: 8px 10px; border-radius: 9px; background: #0b192a; color: #91abc6; font-size: 13px; }
+.citations { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.citations span { padding: 6px 9px; border-radius: 999px; background: #081724; color: #8fb1d4; font-size: 12px; }
+.feedback { display: flex; gap: 8px; margin-top: 14px; }
+.feedback button { border: 0; border-radius: 8px; padding: 7px 10px; background: #19344f; color: #bdd2e8; cursor: pointer; }
+form { display: flex; gap: 12px; margin-top: 18px; }
+textarea { flex: 1; resize: vertical; border: 1px solid #345574; border-radius: 16px; padding: 15px; background: #0b192a; color: white; outline: none; }
+form > button { width: 132px; border: 0; border-radius: 16px; background: #61ddc7; color: #06211d; font-weight: 800; cursor: pointer; }
+form > button:disabled { opacity: .6; }
+@media (max-width: 640px) { header { align-items: flex-start; } article { max-width: 96%; } form { flex-direction: column; } form > button { width: 100%; min-height: 48px; } }

@@ -1,0 +1,14 @@
+version: 1
+rules:
+  - name: confluence_page_id
+    pattern: '(?im)^\s*(?:confluence\s*)?page\s*id\s*[:：]\s*\d+\s*$'
+    replacement: ''
+  - name: last_editor
+    pattern: '(?im)^\s*上次编辑者\s*[:：].*$'
+    replacement: ''
+  - name: browser_video_warning
+    pattern: '(?im)^\s*您的浏览器不支\s*:?\s*持\s*video\s*标签\s*$'
+    replacement: ''
+  - name: pure_number_line
+    pattern: '(?m)^\s*\d+\s*$'
+    replacement: ''

@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: rag-reranker}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: rag-reranker}}
+  template:
+    metadata: {labels: {app: rag-reranker}}
+    spec:
+      nodeSelector: {accelerator: nvidia-a10}
+      containers:
+        - name: reranker
+          image: enterprise-reranker:bge-v2-m3
+          resources:
+            limits: {nvidia.com/gpu: "1", memory: 16Gi}
+          ports: [{containerPort: 9010}]

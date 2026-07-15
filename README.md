@@ -20,15 +20,7 @@
 - Next.js 对话、上传、引用、点赞和点踩界面。
 - Recall@K、MRR 评测 CLI，Docker Compose 与 Kubernetes 清单。
 
-## Windows Python 环境
 
-环境固定为 `RAG_E`，位置为 `D:\Anaconda3_2022_10\envs\RAG_E`。由于中文用户名会影响旧版 Conda 的临时批处理文件，项目脚本直接调用该环境中的 `python.exe`，不依赖 PowerShell 或 `conda activate`。
-
-```bat
-scripts\install_dev.cmd
-scripts\run_api.cmd
-scripts\run_web.cmd
-```
 
 ## Mock 模式
 

@@ -35,12 +35,15 @@ class RecursiveDocumentChunker:
                 content=content,
                 embedding_text=f"{prefix}\n\n{content}".strip(),
                 metadata={
+                    "tenant_id": str(document.metadata.get("tenant_id", "default")),
                     "title": document.title,
                     "summary": document.semantic.summary,
                     "keywords": document.semantic.keywords,
                     "questions": document.semantic.questions,
                     "source_path": str(document.source_path),
                     "checksum": document.checksum,
+                    "source_url": document.metadata.get("source_url"),
+                    "markdown_url": document.metadata.get("markdown_url"),
                 },
             )
             for index, content in enumerate(contents)

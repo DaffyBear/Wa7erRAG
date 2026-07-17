@@ -15,6 +15,7 @@ class ParentDocumentRetriever:
         vector_store: VectorStore,
         reranker: Reranker,
         vector_top_k: int = 20,
+        rerank_candidate_count: int = 20,
         final_top_k: int = 5,
         rrf_k: int = 60,
     ) -> None:
@@ -22,6 +23,7 @@ class ParentDocumentRetriever:
         self.vector_store = vector_store
         self.reranker = reranker
         self.vector_top_k = vector_top_k
+        self.rerank_candidate_count = rerank_candidate_count
         self.final_top_k = final_top_k
         self.rrf_k = rrf_k
 
@@ -85,7 +87,8 @@ class ParentDocumentRetriever:
                 )
             )
 
-        reranked = await self.reranker.rerank(query, candidates)
+        candidates.sort(key=lambda item: item.score, reverse=True)
+        reranked = await self.reranker.rerank(query, candidates[: self.rerank_candidate_count])
         return reranked[: self.final_top_k]
 
 

@@ -1,12 +1,19 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=PROJECT_ROOT / ".env",
+        extra="ignore",
+        case_sensitive=False,
+    )
 
     app_name: str = "Enterprise RAG"
     app_env: str = "development"
@@ -22,6 +29,17 @@ class Settings(BaseSettings):
     security_bootstrap_token: str = "change-me-bootstrap-token"
     security_asset_signing_secret: str = "development-only-asset-signing-secret"
     rag_use_mocks: bool = True
+    rag_metadata_provider: Literal["auto", "heuristic", "openai"] = "auto"
+    rag_embedding_provider: Literal["auto", "deterministic", "openai"] = "auto"
+    rag_vector_store_provider: Literal["auto", "memory", "milvus"] = "auto"
+    rag_object_store_provider: Literal["auto", "local", "minio"] = "auto"
+    rag_rewrite_provider: Literal["auto", "heuristic", "openai"] = "auto"
+    rag_hyde_provider: Literal["auto", "heuristic", "openai"] = "auto"
+    rag_rerank_provider: Literal["auto", "lexical", "http"] = "auto"
+    rag_generation_provider: Literal["auto", "extractive", "openai"] = "auto"
+    rag_trace_provider: Literal["auto", "memory", "postgres"] = "auto"
+    rag_security_provider: Literal["auto", "memory", "postgres"] = "auto"
+    rag_state_provider: Literal["auto", "memory", "redis"] = "auto"
     rag_embedding_model: str = "Qwen3-Embedding-8B"
     rag_embedding_dimension: int = 1024
     rag_generation_model: str = "Qwen2.5-72B"
@@ -31,6 +49,7 @@ class Settings(BaseSettings):
     rag_chunk_size: int = 6000
     rag_chunk_overlap: int = 500
     rag_vector_top_k: int = 20
+    rag_rerank_candidate_count: int = 20
     rag_final_top_k: int = 5
     rag_hyde_enabled: bool = True
     rag_hyde_model: str = "Qwen2.5-7B-Instruct"
@@ -44,6 +63,7 @@ class Settings(BaseSettings):
     model_gateway_base_url: str = "http://localhost:9000/v1"
     model_gateway_api_key: str = "change-me"
     rerank_endpoint: str = "http://localhost:9010/rerank"
+    rerank_api_key: str = ""
     milvus_uri: str = "http://localhost:19530"
     milvus_collection: str = "enterprise_knowledge_tenant_v1"
     postgres_dsn: str = "postgresql+asyncpg://rag:rag@localhost:5432/rag"

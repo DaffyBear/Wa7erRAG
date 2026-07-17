@@ -71,8 +71,26 @@ class IngestionService:
             document.document_id = stable_id(tenant_id, document.document_id)
             document.metadata["tenant_id"] = tenant_id
             if not force and checkpoints.get(f"{tenant_id}:{path.resolve()}") == document.checksum:
+                document_dir = self.output_root / document.document_id
+                document_stem = Path(document.filename).stem
+                markdown_path = document_dir / f"{document_stem}.md"
+                docx_path = document_dir / f"{document_stem}.docx"
+                document_object_root = f"{tenant_id}/{document.document_id}/documents"
                 INGESTED_DOCUMENTS.labels(status="skipped").inc()
-                return IngestionResult(document.document_id, document.filename, 0, skipped=True)
+                return IngestionResult(
+                    document.document_id,
+                    document.filename,
+                    0,
+                    skipped=True,
+                    output_markdown=str(markdown_path),
+                    output_docx=str(docx_path),
+                    source_url=self.object_store.resolve_url(
+                        f"{document_object_root}/{docx_path.name}"
+                    ),
+                    markdown_url=self.object_store.resolve_url(
+                        f"{document_object_root}/{markdown_path.name}"
+                    ),
+                )
             with STAGE_LATENCY.labels(stage="enrichment").time():
                 document.semantic = await self.enricher.enrich(document)
             asset_mapping: dict[str, str] = {}
@@ -82,8 +100,17 @@ class IngestionService:
                 asset.object_name = object_name
                 asset.public_url = await self.object_store.upload(local_path, object_name)
                 asset_mapping[asset.local_path] = asset.public_url
-            document.content = replace_asset_urls(document.content, asset_mapping)
             markdown_path, docx_path = self.exporter.export(document, self.output_root)
+            document_object_root = f"{tenant_id}/{document.document_id}/documents"
+            source_url = await self.object_store.upload(
+                docx_path, f"{document_object_root}/{docx_path.name}"
+            )
+            markdown_url = await self.object_store.upload(
+                markdown_path, f"{document_object_root}/{markdown_path.name}"
+            )
+            document.metadata["source_url"] = source_url
+            document.metadata["markdown_url"] = markdown_url
+            document.content = replace_asset_urls(document.content, asset_mapping)
             chunks = self.chunker.split(document)
             with STAGE_LATENCY.labels(stage="embedding").time():
                 embeddings = await self.embedder.embed([chunk.embedding_text for chunk in chunks])
@@ -101,6 +128,8 @@ class IngestionService:
                 len(chunks),
                 output_markdown=str(markdown_path),
                 output_docx=str(docx_path),
+                source_url=source_url,
+                markdown_url=markdown_url,
             )
 
     async def ingest_directory(
@@ -130,6 +159,7 @@ class RagService:
         cache: Cache,
         session_store: Any,
         vector_top_k: int = 20,
+        rerank_candidate_count: int = 20,
         final_top_k: int = 5,
         cache_ttl_seconds: int = 300,
         session_ttl_seconds: int = 86400,
@@ -142,6 +172,7 @@ class RagService:
             vector_store,
             reranker,
             vector_top_k,
+            rerank_candidate_count,
             final_top_k,
         )
         self.generator = generator
@@ -166,22 +197,29 @@ class RagService:
         effective_history = history or stored_history
         timings: dict[str, float] = {}
 
-        started = time.perf_counter()
-        rewritten = await self.rewriter.rewrite(query, effective_history)
-        timings["rewrite"] = _elapsed(started)
-
+        use_retrieval = _should_use_retrieval(query)
+        if use_retrieval and await self.retriever.vector_store.count(tenant_id) == 0:
+            use_retrieval = False
+        rewritten = query.strip()
         variants: list[str] = []
-        if query.strip() != rewritten.strip():
-            variants.append(query)
-        if self.hyde_enabled:
+        if use_retrieval:
             started = time.perf_counter()
-            with STAGE_LATENCY.labels(stage="hyde_generation").time():
-                hypothetical_answer = await self.hyde_generator.generate(rewritten)
-            timings["hyde_generation"] = _elapsed(started)
-            if hypothetical_answer:
-                variants.append(hypothetical_answer)
+            rewritten = await self.rewriter.rewrite(query, effective_history)
+            timings["rewrite"] = _elapsed(started)
+            if query.strip() != rewritten.strip():
+                variants.append(query)
+            if self.hyde_enabled:
+                started = time.perf_counter()
+                with STAGE_LATENCY.labels(stage="hyde_generation").time():
+                    hypothetical_answer = await self.hyde_generator.generate(rewritten)
+                timings["hyde_generation"] = _elapsed(started)
+                if hypothetical_answer:
+                    variants.append(hypothetical_answer)
+        else:
+            timings["direct_answer_route"] = 1.0
 
-        cache_key = f"rag:answer:{tenant_id}:{stable_id(rewritten, *variants)}"
+        route = "rag" if use_retrieval else "direct"
+        cache_key = f"rag:answer:{route}:{tenant_id}:{stable_id(rewritten, *variants)}"
         cached = await self.cache.get_json(cache_key)
         contexts = []
         if isinstance(cached, dict):
@@ -192,13 +230,16 @@ class RagService:
             )
             timings["cache_hit"] = 1.0
         else:
-            started = time.perf_counter()
-            with STAGE_LATENCY.labels(stage="retrieval_rerank").time():
-                contexts = await self.retriever.retrieve(rewritten, variants, tenant_id)
-            timings["retrieval_rerank"] = _elapsed(started)
+            if use_retrieval:
+                started = time.perf_counter()
+                with STAGE_LATENCY.labels(stage="retrieval_rerank").time():
+                    contexts = await self.retriever.retrieve(rewritten, variants, tenant_id)
+                timings["retrieval_rerank"] = _elapsed(started)
             started = time.perf_counter()
             with STAGE_LATENCY.labels(stage="generation").time():
-                generated = await self.generator.generate(rewritten, contexts)
+                generated = await self.generator.generate(
+                    rewritten, contexts, effective_history
+                )
             timings["generation"] = _elapsed(started)
             await self.cache.set_json(
                 cache_key,
@@ -284,3 +325,25 @@ class RagService:
 
 def _elapsed(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
+
+
+def _should_use_retrieval(query: str) -> bool:
+    normalized = "".join(query.strip().lower().split())
+    conversational = {
+        "你好",
+        "您好",
+        "嗨",
+        "hi",
+        "hello",
+        "在吗",
+        "谢谢",
+        "感谢",
+        "再见",
+        "拜拜",
+        "你是谁",
+        "你能做什么",
+        "介绍一下你自己",
+    }
+    if normalized in conversational:
+        return False
+    return len(normalized) > 2

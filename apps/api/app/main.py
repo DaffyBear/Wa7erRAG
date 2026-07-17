@@ -18,6 +18,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings.data_processed_dir.mkdir(parents=True, exist_ok=True)
     (settings.data_asset_dir / "public").mkdir(parents=True, exist_ok=True)
     container = get_container()
+    if container.redis_backend is not None:
+        await container.redis_backend.ping()
     if not settings.rag_use_mocks and hasattr(container.traces, "create_schema"):
         await container.traces.create_schema()
     await container.security.repository.create_schema()

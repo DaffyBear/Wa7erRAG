@@ -8,6 +8,8 @@ class IngestionResponse(BaseModel):
     skipped: bool
     output_markdown: str
     output_docx: str
+    source_url: str | None = None
+    markdown_url: str | None = None
 
 
 class VectorStatsResponse(BaseModel):

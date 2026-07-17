@@ -12,11 +12,17 @@ def test_short_document_remains_whole() -> None:
         "完整短文",
         title="标题",
         semantic=SemanticMetadata(summary="摘要", keywords=["MQTT"], questions=["如何配置？"]),
+        metadata={
+            "tenant_id": "tenant-a",
+            "source_url": "/api/v1/assets/tenant-a/doc/document.docx?signature=test",
+        },
     )
     chunks = RecursiveDocumentChunker().split(document)
     assert len(chunks) == 1
     assert chunks[0].content == "完整短文"
     assert "全文摘要：摘要" in chunks[0].embedding_text
+    assert chunks[0].metadata["tenant_id"] == "tenant-a"
+    assert chunks[0].metadata["source_url"].startswith("/api/v1/assets/")
 
 
 def test_long_document_has_overlap() -> None:

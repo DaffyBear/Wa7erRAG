@@ -77,6 +77,8 @@ data/reports/*
 !data/assets/.gitkeep
 !data/reports/.gitkeep
 
+data/test-runs/
+
 # Local databases and archives
 *.db
 *.sqlite

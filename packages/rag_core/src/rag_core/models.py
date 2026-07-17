@@ -92,6 +92,8 @@ class IngestionResult:
     skipped: bool = False
     output_markdown: str = ""
     output_docx: str = ""
+    source_url: str | None = None
+    markdown_url: str | None = None
 
 
 @dataclass(slots=True)

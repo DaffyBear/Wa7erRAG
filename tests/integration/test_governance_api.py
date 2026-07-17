@@ -12,7 +12,13 @@ def test_governance_api_runs_audit(tmp_path: Path) -> None:
     (data_root / "sample.md").write_text("# ??\n\nPage ID: 99\n\n????", encoding="utf-8")
     settings = get_settings()
     original_reports = settings.data_reports_dir
+    original_trace_provider = settings.rag_trace_provider
+    original_security_provider = settings.rag_security_provider
+    original_state_provider = settings.rag_state_provider
     settings.data_reports_dir = tmp_path / "reports"
+    settings.rag_trace_provider = "memory"
+    settings.rag_security_provider = "memory"
+    settings.rag_state_provider = "memory"
     get_container.cache_clear()
     with TestClient(app) as client:
         bootstrap = client.post(
@@ -40,4 +46,7 @@ def test_governance_api_runs_audit(tmp_path: Path) -> None:
         assert listed.status_code == 200
         assert listed.json()[0]["run_id"] == payload["run_id"]
     settings.data_reports_dir = original_reports
+    settings.rag_trace_provider = original_trace_provider
+    settings.rag_security_provider = original_security_provider
+    settings.rag_state_provider = original_state_provider
     get_container.cache_clear()

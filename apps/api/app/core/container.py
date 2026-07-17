@@ -66,34 +66,55 @@ def get_container() -> Container:
         settings.rag_chunk_size,
         settings.rag_chunk_overlap,
     )
-    redis_backend = None
 
-    if settings.rag_use_mocks:
+    metadata_provider = _provider(
+        settings.rag_metadata_provider, settings.rag_use_mocks, "heuristic", "openai"
+    )
+    embedding_provider = _provider(
+        settings.rag_embedding_provider, settings.rag_use_mocks, "deterministic", "openai"
+    )
+    vector_store_provider = _provider(
+        settings.rag_vector_store_provider, settings.rag_use_mocks, "memory", "milvus"
+    )
+    object_store_provider = _provider(
+        settings.rag_object_store_provider, settings.rag_use_mocks, "local", "minio"
+    )
+    rewrite_provider = _provider(
+        settings.rag_rewrite_provider, settings.rag_use_mocks, "heuristic", "openai"
+    )
+    hyde_provider = _provider(
+        settings.rag_hyde_provider, settings.rag_use_mocks, "heuristic", "openai"
+    )
+    rerank_provider = _provider(
+        settings.rag_rerank_provider, settings.rag_use_mocks, "lexical", "http"
+    )
+    generation_provider = _provider(
+        settings.rag_generation_provider, settings.rag_use_mocks, "extractive", "openai"
+    )
+
+    trace_provider = _provider(
+        settings.rag_trace_provider, settings.rag_use_mocks, "memory", "postgres"
+    )
+    security_provider = _provider(
+        settings.rag_security_provider, settings.rag_use_mocks, "memory", "postgres"
+    )
+    state_provider = _provider(
+        settings.rag_state_provider, settings.rag_use_mocks, "memory", "redis"
+    )
+
+    if metadata_provider == "heuristic":
         enricher = HeuristicMetadataEnricher()
-        embedder = DeterministicHashEmbedder(settings.rag_embedding_dimension)
-        vector_store = InMemoryVectorStore()
-        object_store = LocalObjectStore(
-            settings.data_asset_dir / "public",
-            signing_secret=settings.security_asset_signing_secret,
-        )
-        rewriter = HeuristicQueryRewriter()
-        hyde_generator = HeuristicHydeGenerator()
-        reranker = LexicalReranker()
-        generator = ExtractiveAnswerGenerator()
-        traces = InMemoryTraceRepository()
-        cache = InMemoryCache()
-        sessions = InMemorySessionStore()
-        locks = InMemoryLockManager()
-        rate_limiter = InMemoryRateLimiter()
-        security_repository = InMemorySecurityRepository()
     else:
-        redis_backend = RedisStateBackend(settings.redis_url)
         enricher = OpenAICompatibleMetadataEnricher(
             settings.model_gateway_base_url,
             settings.model_gateway_api_key,
             settings.rag_generation_model,
             settings.request_timeout_seconds,
         )
+
+    if embedding_provider == "deterministic":
+        embedder = DeterministicHashEmbedder(settings.rag_embedding_dimension)
+    else:
         embedder = OpenAICompatibleEmbedder(
             settings.model_gateway_base_url,
             settings.model_gateway_api_key,
@@ -101,6 +122,10 @@ def get_container() -> Container:
             settings.rag_embedding_dimension,
             settings.request_timeout_seconds,
         )
+
+    if vector_store_provider == "memory":
+        vector_store = InMemoryVectorStore()
+    else:
         vector_store = MilvusVectorStore(
             settings.milvus_uri,
             settings.milvus_collection,
@@ -108,6 +133,13 @@ def get_container() -> Container:
             settings.rag_hnsw_ef_construction,
             settings.rag_hnsw_ef_search,
         )
+
+    if object_store_provider == "local":
+        object_store = LocalObjectStore(
+            settings.data_asset_dir / "public",
+            signing_secret=settings.security_asset_signing_secret,
+        )
+    else:
         object_store = MinioObjectStore(
             settings.minio_endpoint,
             settings.minio_access_key,
@@ -116,29 +148,67 @@ def get_container() -> Container:
             settings.minio_secure,
             signing_secret=settings.security_asset_signing_secret,
         )
+
+    if rewrite_provider == "heuristic":
+        rewriter = HeuristicQueryRewriter()
+    else:
         rewriter = OpenAICompatibleQueryRewriter(
             settings.model_gateway_base_url,
             settings.model_gateway_api_key,
             settings.rag_rewrite_model,
         )
+
+    if hyde_provider == "heuristic":
+        hyde_generator = HeuristicHydeGenerator()
+    else:
         hyde_generator = OpenAICompatibleHydeGenerator(
             settings.model_gateway_base_url,
             settings.model_gateway_api_key,
             settings.rag_hyde_model,
         )
-        reranker = HttpReranker(settings.rerank_endpoint, settings.rag_rerank_model)
+
+    if rerank_provider == "lexical":
+        reranker = LexicalReranker()
+    else:
+        reranker = HttpReranker(
+            settings.rerank_endpoint,
+            settings.rag_rerank_model,
+            settings.rerank_api_key,
+        )
+
+    if generation_provider == "extractive":
+        generator = ExtractiveAnswerGenerator()
+    else:
         generator = OpenAICompatibleAnswerGenerator(
             settings.model_gateway_base_url,
             settings.model_gateway_api_key,
             settings.rag_generation_model,
             120.0,
         )
-        traces = PostgresTraceRepository(settings.postgres_dsn)
-        cache = RedisCache(settings.redis_url)
+
+    redis_backend = None
+    if state_provider == "memory":
+        cache = InMemoryCache()
+        sessions = InMemorySessionStore()
+        locks = InMemoryLockManager()
+        rate_limiter = InMemoryRateLimiter()
+    else:
+        redis_backend = RedisStateBackend(settings.redis_url)
+        cache = RedisCache(client=redis_backend.client)
         sessions = redis_backend.sessions
         locks = redis_backend.locks
         rate_limiter = redis_backend.rate_limiter
-        security_repository = PostgresSecurityRepository(settings.postgres_dsn)
+
+    traces = (
+        PostgresTraceRepository(settings.postgres_dsn)
+        if trace_provider == "postgres"
+        else InMemoryTraceRepository()
+    )
+    security_repository = (
+        PostgresSecurityRepository(settings.postgres_dsn)
+        if security_provider == "postgres"
+        else InMemorySecurityRepository()
+    )
 
     security = SecurityService(
         security_repository,
@@ -149,11 +219,7 @@ def get_container() -> Container:
             settings.security_access_token_ttl_seconds,
         ),
     )
-    governance = DataGovernanceService(
-        parser_registry,
-        cleaner,
-        settings.data_reports_dir,
-    )
+    governance = DataGovernanceService(parser_registry, cleaner, settings.data_reports_dir)
     ingestion = IngestionService(
         parser_registry,
         cleaner,
@@ -177,8 +243,9 @@ def get_container() -> Container:
         traces,
         cache,
         sessions,
-        settings.rag_vector_top_k,
-        settings.rag_final_top_k,
+        vector_top_k=settings.rag_vector_top_k,
+        rerank_candidate_count=settings.rag_rerank_candidate_count,
+        final_top_k=settings.rag_final_top_k,
         session_ttl_seconds=settings.rag_session_ttl_seconds,
         hyde_enabled=settings.rag_hyde_enabled,
     )
@@ -195,3 +262,9 @@ def get_container() -> Container:
         security=security,
         redis_backend=redis_backend,
     )
+
+
+def _provider(value: str, use_mocks: bool, mock_default: str, production_default: str) -> str:
+    if value != "auto":
+        return value
+    return mock_default if use_mocks else production_default

@@ -10,3 +10,20 @@ def test_production_defaults_match_documented_architecture() -> None:
     assert settings.rag_vector_top_k == 20
     assert settings.rag_hnsw_m == 16
     assert settings.rag_hnsw_ef_construction == 256
+
+def test_component_providers_can_override_mock_mode() -> None:
+    settings = Settings(
+        _env_file=None,
+        rag_use_mocks=True,
+        rag_embedding_provider="openai",
+        rag_generation_provider="openai",
+        rag_object_store_provider="local",
+        rag_rerank_provider="lexical",
+        rag_state_provider="redis",
+    )
+
+    assert settings.rag_embedding_provider == "openai"
+    assert settings.rag_generation_provider == "openai"
+    assert settings.rag_object_store_provider == "local"
+    assert settings.rag_rerank_provider == "lexical"
+    assert settings.rag_state_provider == "redis"

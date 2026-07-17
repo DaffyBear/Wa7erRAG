@@ -86,10 +86,16 @@ class RateLimiter(Protocol):
 
 class AnswerGenerator(Protocol):
     async def generate(
-        self, query: str, contexts: Sequence[RetrievalResult]
+        self,
+        query: str,
+        contexts: Sequence[RetrievalResult],
+        history: Sequence[dict[str, str]] = (),
     ) -> GeneratedAnswer: ...
     async def stream(
-        self, query: str, contexts: Sequence[RetrievalResult]
+        self,
+        query: str,
+        contexts: Sequence[RetrievalResult],
+        history: Sequence[dict[str, str]] = (),
     ) -> AsyncIterator[str]: ...
 
 

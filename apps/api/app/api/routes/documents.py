@@ -28,7 +28,7 @@ async def upload_document(
 ) -> IngestionResponse:
     settings = get_settings()
     suffix = Path(file.filename or "document").suffix.lower()
-    if suffix not in {".docx", ".md", ".markdown", ".txt", ".html", ".htm"}:
+    if suffix not in {".docx", ".pdf", ".md", ".markdown", ".txt", ".html", ".htm"}:
         raise HTTPException(status_code=415, detail=f"Unsupported document type: {suffix}")
     tenant_raw_dir = settings.data_raw_dir / principal.tenant_id
     tenant_raw_dir.mkdir(parents=True, exist_ok=True)

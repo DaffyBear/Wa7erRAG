@@ -9,7 +9,31 @@ from fastapi.testclient import TestClient
 def test_chat_rate_limit_and_session_endpoints(tmp_path: Path) -> None:
     settings = get_settings()
     original_limit = settings.rag_chat_rate_limit
+    original_providers = {
+        "rag_metadata_provider": settings.rag_metadata_provider,
+        "rag_embedding_provider": settings.rag_embedding_provider,
+        "rag_vector_store_provider": settings.rag_vector_store_provider,
+        "rag_object_store_provider": settings.rag_object_store_provider,
+        "rag_rewrite_provider": settings.rag_rewrite_provider,
+        "rag_hyde_provider": settings.rag_hyde_provider,
+        "rag_rerank_provider": settings.rag_rerank_provider,
+        "rag_generation_provider": settings.rag_generation_provider,
+        "rag_trace_provider": settings.rag_trace_provider,
+        "rag_security_provider": settings.rag_security_provider,
+        "rag_state_provider": settings.rag_state_provider,
+    }
     settings.rag_chat_rate_limit = 2
+    settings.rag_metadata_provider = "heuristic"
+    settings.rag_embedding_provider = "deterministic"
+    settings.rag_vector_store_provider = "memory"
+    settings.rag_object_store_provider = "local"
+    settings.rag_rewrite_provider = "heuristic"
+    settings.rag_hyde_provider = "heuristic"
+    settings.rag_rerank_provider = "lexical"
+    settings.rag_generation_provider = "extractive"
+    settings.rag_trace_provider = "memory"
+    settings.rag_security_provider = "memory"
+    settings.rag_state_provider = "memory"
     get_container.cache_clear()
     container = get_container()
     source = tmp_path / "guide.md"
@@ -52,4 +76,6 @@ def test_chat_rate_limit_and_session_endpoints(tmp_path: Path) -> None:
         )
 
     settings.rag_chat_rate_limit = original_limit
+    for name, value in original_providers.items():
+        setattr(settings, name, value)
     get_container.cache_clear()

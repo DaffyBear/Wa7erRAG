@@ -38,6 +38,31 @@ class HtmlDocumentParser:
         return _new_document(path, content, title=title)
 
 
+class PdfDocumentParser:
+    extensions = {".pdf"}
+
+    def supports(self, path: Path) -> bool:
+        return path.suffix.lower() in self.extensions
+
+    def parse(self, path: Path) -> Document:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+        pages: list[str] = []
+        for page_number, page in enumerate(reader.pages, start=1):
+            text = (page.extract_text() or "").strip()
+            if text:
+                pages.append(f"## Page {page_number}\n\n{text}")
+        if not pages:
+            raise ValueError(
+                f"PDF contains no extractable text and requires OCR: {path.name}"
+            )
+        title = _pdf_title(reader) or path.stem
+        document = _new_document(path, "\n\n".join(pages), title=title)
+        document.metadata["page_count"] = len(reader.pages)
+        return document
+
+
 class DocxDocumentParser:
     extensions = {".docx"}
 
@@ -124,7 +149,12 @@ class ParserRegistry:
 
 def default_parser_registry(asset_root: Path) -> ParserRegistry:
     return ParserRegistry(
-        [DocxDocumentParser(asset_root), HtmlDocumentParser(), TextDocumentParser()]
+        [
+            DocxDocumentParser(asset_root),
+            PdfDocumentParser(),
+            HtmlDocumentParser(),
+            TextDocumentParser(),
+        ]
     )
 
 
@@ -163,3 +193,10 @@ def _iter_blocks(parent: object, paragraph_type: type, table_type: type, documen
             yield paragraph_type(child, parent)
         elif isinstance(child, CT_Tbl):
             yield table_type(child, parent)
+
+
+
+def _pdf_title(reader: object) -> str:
+    metadata = getattr(reader, "metadata", None)
+    title = getattr(metadata, "title", "") if metadata else ""
+    return str(title).strip() if title else ""

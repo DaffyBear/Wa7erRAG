@@ -16,10 +16,14 @@ class InMemoryCache:
 
 
 class RedisCache:
-    def __init__(self, url: str) -> None:
-        from redis.asyncio import from_url
+    def __init__(self, url: str | None = None, client: Any | None = None) -> None:
+        if client is None:
+            if url is None:
+                raise ValueError("Redis URL or client is required")
+            from redis.asyncio import from_url
 
-        self.client = from_url(url, decode_responses=True)
+            client = from_url(url, decode_responses=True)
+        self.client = client
 
     async def get_json(self, key: str) -> Any | None:
         value = await self.client.get(key)

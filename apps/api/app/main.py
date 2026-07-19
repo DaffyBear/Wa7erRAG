@@ -23,9 +23,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if not settings.rag_use_mocks and hasattr(container.traces, "create_schema"):
         await container.traces.create_schema()
     await container.security.repository.create_schema()
-    yield
-    if container.redis_backend is not None:
-        await container.redis_backend.close()
+    try:
+        yield
+    finally:
+        reranker = container.rag.retriever.reranker
+        if hasattr(reranker, "close"):
+            await reranker.close()
+        if container.redis_backend is not None:
+            await container.redis_backend.close()
 
 
 settings = get_settings()

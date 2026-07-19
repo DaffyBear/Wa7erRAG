@@ -116,8 +116,8 @@ def get_container() -> Container:
         embedder = DeterministicHashEmbedder(settings.rag_embedding_dimension)
     else:
         embedder = OpenAICompatibleEmbedder(
-            settings.model_gateway_base_url,
-            settings.model_gateway_api_key,
+            settings.embedding_gateway_base_url or settings.model_gateway_base_url,
+            settings.embedding_gateway_api_key or settings.model_gateway_api_key,
             settings.rag_embedding_model,
             settings.rag_embedding_dimension,
             settings.request_timeout_seconds,
@@ -167,13 +167,28 @@ def get_container() -> Container:
             settings.rag_hyde_model,
         )
 
+    lexical_reranker = LexicalReranker()
     if rerank_provider == "lexical":
-        reranker = LexicalReranker()
+        reranker = lexical_reranker
     else:
         reranker = HttpReranker(
             settings.rerank_endpoint,
             settings.rag_rerank_model,
             settings.rerank_api_key,
+            timeout=settings.rerank_timeout_seconds,
+            max_retries=settings.rerank_max_retries,
+            retry_base_delay_seconds=settings.rerank_retry_base_delay_seconds,
+            retry_max_delay_seconds=settings.rerank_retry_max_delay_seconds,
+            max_concurrency=settings.rerank_max_concurrency,
+            queue_timeout_seconds=settings.rerank_queue_timeout_seconds,
+            circuit_failure_threshold=settings.rerank_circuit_failure_threshold,
+            circuit_recovery_seconds=settings.rerank_circuit_recovery_seconds,
+            max_document_chars=settings.rerank_max_document_chars,
+            fallback=(
+                lexical_reranker
+                if settings.rerank_fallback_provider == "lexical"
+                else None
+            ),
         )
 
     if generation_provider == "extractive":

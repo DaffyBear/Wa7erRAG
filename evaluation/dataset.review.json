@@ -1,0 +1,938 @@
+{
+  "cases": [
+    {
+      "question": "哪种中心性度量在识别北欧输电电网关键节点方面表现最好？",
+      "expected_document": "1-s2.0-S0378437123006271-main.pdf",
+      "reference_answer": "加权组合中心度度量（weighted combined centrality measure）表现最好。",
+      "evidence": "The outcome from this study is that the weighted and combined centrality measure performed the best in terms of identifying critical nodes in the Nordic transmission grid."
+    },
+    {
+      "question": "在IEEE 39和57节点系统上，DRL策略与基准RAS策略相比在哪些方面表现更优？",
+      "expected_document": "1-s2.0-S0951832024003156-main.pdf",
+      "reference_answer": "DRL策略在电力保存和决策时间方面均优于基准RAS策略。",
+      "evidence": "Results demonstrate the out-performance of trained policy over benchmarks in both power preservation and decision times."
+    },
+    {
+      "question": "风电和负荷不确定性对级联指数的影响在什么情况下变得显著？",
+      "expected_document": "1-s2.0-S2352467724000833-main.pdf",
+      "reference_answer": "对于大网络，影响变得显著。",
+      "evidence": "While the impact on cascading indices is negligible for small networks, it becomes notable in the case of larger networks."
+    },
+    {
+      "question": "在IEEE 39节点标准测试系统上，所提方法预测Braess悖论的准确率是多少？",
+      "expected_document": "1.Predicting Braess’s paradox of power grids using graph neural networks.pdf",
+      "reference_answer": "93.8%。",
+      "evidence": "Experimental results on the IEEE 39... achieving prediction accuracies of 93.8%..."
+    },
+    {
+      "question": "传统测试用例缺少哪两个关键网络运行约束？",
+      "expected_document": "1411.0359v6.pdf",
+      "reference_answer": "线路热极限和发电机能力曲线",
+      "evidence": "many of the traditional test cases are missing key network operation constraints, such as line thermal limits and generator capability curves."
+    },
+    {
+      "question": "在1996年7月2日的美国西部大停电中，故障序列在哪两个点之间跳过了数百公里？",
+      "expected_document": "1508.01775v2.pdf",
+      "reference_answer": "从3到4和从7到8",
+      "evidence": "The sequence jumps across hundreds of kilometers at several points, such as from 3 - 4 and from 7 - 8."
+    },
+    {
+      "question": "PPO算法使用什么技术来形成对策略性能的悲观估计？",
+      "expected_document": "1707.06347v2.pdf",
+      "reference_answer": "裁剪概率比率（clipped probability ratios）",
+      "evidence": "We propose a novel objective with clipped probability ratios, which forms a pessimistic estimate (i.e., lower bound) of the performance of the policy."
+    },
+    {
+      "question": "Liquid Time-constant Networks中系统的时变时间常数τ_sys是如何定义的？",
+      "expected_document": "2006.04439v4.pdf",
+      "reference_answer": "τ_sys = τ/(1+τ f(x(t),I(t),t,θ))",
+      "evidence": "τ_sys = τ/(1+τ f(x(t),I(t),t,θ))"
+    },
+    {
+      "question": "截至2022年底，南方电网非化石能源装机占比是多少？",
+      "expected_document": "2023年南方电网发展报告（摘要）.md",
+      "reference_answer": "57.9%",
+      "evidence": "非化石能源装机占比 | **57.9%**"
+    },
+    {
+      "question": "“夸父”预测系统超短期预测的误差范围是多少？",
+      "expected_document": "2023年数字电网技术装备白皮书.md",
+      "reference_answer": "小于5%",
+      "evidence": "预测精度：超短期（4h）误差 < 5%"
+    },
+    {
+      "question": "2025年南方五省区新能源装机占比预计达到多少？",
+      "expected_document": "2024年新型电力系统量化评估报告.md",
+      "reference_answer": "35%",
+      "evidence": "2025年：南方五省区新能源装机占比预计达**35%**"
+    },
+    {
+      "question": "构网型技术的核心作用是什么？",
+      "expected_document": "2025年新型电力系统十大技术.md",
+      "reference_answer": "新能源变流器模拟同步发电机特性，提供惯量与电压支撑。",
+      "evidence": "技术清单中第一项构网型技术的说明即为：新能源变流器模拟同步发电机特性，提供惯量与电压支撑。"
+    },
+    {
+      "question": "新一代载波通信技术的通信速率最低达到多少？",
+      "expected_document": "2025年新一代载波通信技术白皮书.md",
+      "reference_answer": "≥ 10 Mbps",
+      "evidence": "从表格中可以看出，新一代技术的通信速率为 ≥ 10 Mbps。"
+    },
+    {
+      "question": "在AI驱动的故障诊断与预测专题中，配电网故障定位采用什么方法？",
+      "expected_document": "2026年南方电网技术期刊专题.md",
+      "reference_answer": "基于图神经网络",
+      "evidence": "原文中明确写道：基于图神经网络的配电网故障定位。"
+    },
+    {
+      "question": "安全内生技术中提到了哪些具体的安全机制？",
+      "expected_document": "2026年智联电网通信技术白皮书.md",
+      "reference_answer": "量子加密、零信任架构",
+      "evidence": "原文中写道：量子加密、零信任架构全面嵌入通信协议。"
+    },
+    {
+      "question": "TRC方法相比其他安全强化学习方法，性能提升了多少倍？",
+      "expected_document": "2312.00344v1.pdf",
+      "reference_answer": "1.93倍",
+      "evidence": "Compared to other safe RL methods, the performance is improved by 1.93 times"
+    },
+    {
+      "question": "在价格变化场景下，较大电网的母线潮流误差最大可增大多少数量级？",
+      "expected_document": "2407.12421v1.pdf",
+      "reference_answer": "6个数量级",
+      "evidence": "with bus power flow errors escalating by up to six orders of magnitude for larger grids."
+    },
+    {
+      "question": "哪种GNN架构能够有效处理节点特定信息并通过增强特征聚合？",
+      "expected_document": "2502.05702v1.pdf",
+      "reference_answer": "GraphConv",
+      "evidence": "GraphConv with its effective handling of node-specific information through enhanced feature aggregation"
+    },
+    {
+      "question": "该论文提出的复合脆弱性指标是由哪三个中心性度量构成的？",
+      "expected_document": "5.0137919.pdf",
+      "reference_answer": "介数中心性、生成树度量和断开组件中心性",
+      "evidence": "The betweenness centrality... the spanning tree metric... The disconnected component centrality... creating a composite index of these three measures"
+    },
+    {
+      "question": "在IEEE 39与118节点标准系统中，所提模型在隐患线路预测任务上采用什么评价指标且显著优于基线？",
+      "expected_document": "初稿第san版.pdf",
+      "reference_answer": "F1分数。",
+      "evidence": "在IEEE 39与118节点标准系统中的大量实验表明，该模型在隐患线路预测任务上的F1分数显著优于主流图神经网络基线。"
+    },
+    {
+      "question": "该文档目录中列出的第1个问题是什么？",
+      "expected_document": "大数据面试核心101问.pdf",
+      "reference_answer": "HDFS的架构。",
+      "evidence": "1. HDFS 的架构"
+    },
+    {
+      "question": "在节点初始负载模型一中，节点初始负载与节点度之间满足什么关系式？",
+      "expected_document": "带有邻居度信息的容量负载模型下电网级联故障研究_邹艳丽.pdf",
+      "reference_answer": "F_i = k_i^β",
+      "evidence": "节点的初始负载定义为：F_i = k_i^β，i=1,2,…,N"
+    },
+    {
+      "question": "在三种发电机功率分配方案中，哪一种方案下系统同步和稳定性能最佳？",
+      "expected_document": "电网发电机功率分配及电网负载不均衡发展研究_陈思谕.pdf",
+      "reference_answer": "DC方案（发电机功率按节点度中心性正比分配）",
+      "evidence": "发电机功率按DC方式分配时，系统同步和稳定性能均最佳；按PE方式分配时，系统同步和稳定性能均最差；按CC方式分配时，系统同步和稳定性能居中。"
+    },
+    {
+      "question": "输电线路耦合强度按哪种方式分配时，电网的同步和稳定性能最佳？",
+      "expected_document": "电网输电线路耦合强度分配策略研究_陈思谕.pdf",
+      "reference_answer": "TP方式（按系统等耦合强度同步运行状态下线路传输功率的绝对值大小正比分配）",
+      "evidence": "输电线路耦合强度按TP方式分配时，电网的同步和稳定性能皆为最佳；按LB方式分配时，电网的同步和稳定性能均为最差；按EQ方式分配时，电网的同步和稳定性能居中。"
+    },
+    {
+      "question": "该方法使用了哪几个指标来评估电网节点的重要度？",
+      "expected_document": "基于多属性决策的电力网络关键节点识别_何铭.pdf",
+      "reference_answer": "紧密度中心性、凝聚度、电气介数中心性、PageRank、子图指标。",
+      "evidence": "综合了电网节点紧密度中心性指标、凝聚度指标、电气介数中心性指标、PageRank指标与子图指标这5个指标对电网进行评价。"
+    },
+    {
+      "question": "在电网级联故障模型中，节点的初始负载是如何定义的？",
+      "expected_document": "基于二阶邻居负载再分配的电网级联故障研究_胡金梅.pdf",
+      "reference_answer": "节点的初始负载定义为与节点度相关的幂律函数，即F_i = k_i^β，其中k_i是节点i的度，β是可调的负载参数。",
+      "evidence": "节点的初始负载定义为与节点度相关的幂律函数[17]，即F_i = k_i^β，式中k_i是节点i的度，β是可调的负载参数(β>0)，可调节初始负载强度。"
+    },
+    {
+      "question": "2016年9月28日，南澳大利亚州大停电持续了多长时间？",
+      "expected_document": "基于复杂网络理论的大电网脆弱性研究综述.pdf",
+      "reference_answer": "50小时",
+      "evidence": "2016年9月28日，极端天气袭击了南澳大利亚州，导致风电机组发生大规模故障，最终演变成长达50小时的全州大停电。"
+    },
+    {
+      "question": "网络凝聚度取决于哪两个因素？",
+      "expected_document": "基于复杂网络理论的电力网络关键线路识别_傅杰.pdf",
+      "reference_answer": "网络中各个节点间的连通能力和网络中的节点数目N。",
+      "evidence": "网络的凝聚度取决于两个因素：一个是网络中各个节点间的连通能力，另外一个是网络中的节点数目N。"
+    },
+    {
+      "question": "文中研究的网络类型是什么？",
+      "expected_document": "基于复杂网络理论的电力网络同步及稳定性研究_韦芳琼.pdf",
+      "reference_answer": "复杂网络和电力网络",
+      "evidence": "（复杂网络）和 （电力网络）"
+    },
+    {
+      "question": "论文中提出的基于改进K_shell算法的电网关键节点识别方法构建了哪些多维度指标？",
+      "expected_document": "基于复杂网络理论的电网关键节点识别与级联故障控制策略_彭佳.pdf",
+      "reference_answer": "节点度数、节点中心性、节点电气介数中心以及节点综合贡献度。",
+      "evidence": "构建了节点度数、节点中心性、节点电气介数中心以及节点综合贡献度等多维度指标。"
+    },
+    {
+      "question": "节点功率越大，度值越小，其局部同步能力如何？",
+      "expected_document": "基于复杂网络理论的电网耦合强度分配策略_高正.pdf",
+      "reference_answer": "节点功率越大，度值越小，它的局部同步能力就越弱。",
+      "evidence": "一般情况下，节点功率越大，度值越小，它的局部同步能力就越弱，该节点与其邻居节点就越难达到局部同步状态。"
+    },
+    {
+      "question": "在二阶类Kuramoto模型中，节点i为发电机节点时，其功率P_i满足什么条件？",
+      "expected_document": "基于复杂网络拓扑的电网Braess悖论现象研究_邵贝贝.pdf",
+      "reference_answer": "P_i > 0。",
+      "evidence": "节点i为发电机节点时，P_i＞0"
+    },
+    {
+      "question": "当节点v_j接收到来自节点v_i的负荷后，其剩余容量C(v_j)是如何计算的？",
+      "expected_document": "基于节点最大剩余容量的改进负荷再分配策略_王立夫.pdf",
+      "reference_answer": "C(v_j) = C0(v_j) - L0(v_j)，其中C0(v_j)为节点v_j的初始容量，L0(v_j)为节点v_j的初始负荷。",
+      "evidence": "当节点v_j接收到来自节点v_i的负荷L(v_i)后，节点v_j剩余容量C(v_j)为C(v_j) = C0(v_j) - L0(v_j)。"
+    },
+    {
+      "question": "该模型通过什么神经网络对电网网络结构进行感知？",
+      "expected_document": "基于深度强化学习的电网关键节点识别_孙泽军.pdf",
+      "reference_answer": "图神经网络GCN。",
+      "evidence": "该模型通过图神经网络GCN对电网网络结构进行感知。"
+    },
+    {
+      "question": "该算法中，用于对策略模型进行进阶训练的强化学习算法是什么？",
+      "expected_document": "基于图神经网络和强化学习的电网风险态势感知_郭创新.pdf",
+      "reference_answer": "近端策略优化（PPO）强化学习算法。",
+      "evidence": "基于近端策略优化（proximal policy optimization，PPO）强化学习算法对该网络策略模型进行进阶训练"
+    },
+    {
+      "question": "为了改善不均衡样本的训练效果，该模型采用了什么损失函数？",
+      "expected_document": "基于图注意力深度网络的电力系统暂态稳定评估_钟智.pdf",
+      "reference_answer": "采用了加权交叉熵损失函数。",
+      "evidence": "采用加权交叉熵损失函数改善不均衡样本的训练效果"
+    },
+    {
+      "question": "分布式电站以哪种入网方式接入电网时，电网的同步性能最好？",
+      "expected_document": "基于源荷节点对供电效率的分布式电站并网选址研究_吴克祥.pdf",
+      "reference_answer": "按供电效率值从小到大排列的接入方式。",
+      "evidence": "分布式电站按供电效率值从小到大排列的接入方式为最优，其次是随机选择负荷节点的方式，供电效率值从大到小排列的方式最差。因此，分布式电站以源荷节点对供电效率指标较小的负荷节点开始接入电网，电网的同步性能最好。"
+    },
+    {
+      "question": "如何将负载节点划分到对应的发电机节点集合中？",
+      "expected_document": "基于子网划分的电网关键节点识别_邹艳丽.pdf",
+      "reference_answer": "对于负载节点j，比较其从各发电机节点得到的功率分配系数k_ij，如果(k_ij)_max = k_mj，则将其划分到发电机m所在的子网中。",
+      "evidence": "对于负载节点j来说，比较其从各发电机节点得到的的功率分配系数k_ij,如果(k_ij)_max = k_mj,则将其划分到发电机m所在的子网中。"
+    },
+    {
+      "question": "在RLcascade项目的基准测试中，无干预模型（No-Action）的平均保电率G是多少？",
+      "expected_document": "集成拓扑与动态物理响应考虑概率不确定性的级联故障防御框架.docx",
+      "reference_answer": "56.0427%",
+      "evidence": "Final Result | mode=noras\nmean G = 56.0427%"
+    },
+    {
+      "question": "文中用于定量计算各扰动源对电能质量影响程度的指标是什么？",
+      "expected_document": "计及多种扰动源的有源配电网电能质量分析方法.pdf",
+      "reference_answer": "相对影响因子",
+      "evidence": "建立相对影响因子定量分析各扰动源对电能质量的影响程度，并以IEEE 33节点配电网为例验证该方法有效性。"
+    },
+    {
+      "question": "在IEEE39数据集上，所提出的基于图神经网络的Braess悖论预测方法的预测精度是多少？",
+      "expected_document": "结合图神经网络的电网Braess悖论预测和网络优化研究（终稿）.pdf",
+      "reference_answer": "93.8%",
+      "evidence": "在IEEE39、IEEE57、IEEE118数据集测试结果表明，本文提出的方法预测精度所提方法对Braess悖论预测精度分别达到了93.8%、88.8%和88.1%。"
+    },
+    {
+      "question": "断面控制智能体将传统多长时间的策略推演压缩至秒级？",
+      "expected_document": "南方电网控制与电网技术专题报告.md",
+      "reference_answer": "15分钟。",
+      "evidence": "将传统15分钟推算压缩至秒级。"
+    },
+    {
+      "question": "当互联电网的网间传输功率达到临界值时，在哪种情况下增加传输线路可以避免Braess悖论现象？",
+      "expected_document": "如何避免互联电网中的Braess悖论现象_张少泽.pdf",
+      "reference_answer": "在受电子网内及子网间增加传输线路。",
+      "evidence": "当网间的功率传输达到某一临界值时，在互联电网的受电子网内及子网间增加传输线路，互联电网发生Braess悖论现象的概率降低到接近于零，从而避免发生Braess悖论现象。"
+    },
+    {
+      "question": "文中提出的FDIAs辨识方法利用了非线性滤波器的什么特性？",
+      "expected_document": "伪量测建模与AUKF在配电网虚假数据注入攻击辨识中的应用_陈碧云.pdf",
+      "reference_answer": "利用了非线性滤波算法的动态迟滞特性。",
+      "evidence": "利用非线性滤波算法的动态迟滞特性，在线检测动态、静态状态估计的估计值偏差，对虚假数据注入攻击进行辨识。"
+    },
+    {
+      "question": "在配电网暂态建模预设条件中，对110 kV/10.5 kV变电站出口母线做了怎样的假设？",
+      "expected_document": "有源配电网典型暂态模型及区域分割并行仿真方法研究.pdf",
+      "reference_answer": "假设为理想电压源",
+      "evidence": "假设110 kV/10.5 kV变电站出口母线为理想电压源"
+    },
+    {
+      "question": "根据文档，在重载或接近稳定极限时，直流潮流的误差可达多少？",
+      "expected_document": "智能电网学术研究与工程实践差异辨析.docx",
+      "reference_answer": "30%以上",
+      "evidence": "在重载或接近稳定极限时，直流潮流误差可达30%以上"
+    },
+    {
+      "question": "在改进的在线生成对抗网络防御算法中，采用了哪两种技术来加快运算参数的训练过程？",
+      "expected_document": "智能电网中虚假数据注入攻击的检测与防御研究_王媛媛.pdf",
+      "reference_answer": "平滑梯度运算和自适应窗口结构",
+      "evidence": "采用平滑梯度运算和自适应的窗口结构来改进生成对抗网络算法，加快算法中运算参数的训练过程"
+    },
+    {
+      "question": "随着恢复概率增加，网络故障风险概率如何变化？",
+      "expected_document": "A cascading failure propagation model for a network with a node emergency recovery function.pdf",
+      "reference_answer": "网络故障风险概率逐渐降低。",
+      "evidence": "As the recovery probability increases, the network failure risk probability gradually decreases."
+    },
+    {
+      "question": "该模型使用什么机制来学习传输线之间的相关性？",
+      "expected_document": "A Dual Power Grid Cascading Failure Model for.pdf",
+      "reference_answer": "注意力机制（Attention mechanism），产生一个信息丰富的相关性矩阵，即Attention Matrix。",
+      "evidence": "Multiple modifications and adjustments are proposed to support the attention mechanism producing an informative correlation matrix, the Attention Matrix."
+    },
+    {
+      "question": "广义影响图能够再现什么？",
+      "expected_document": "A Markovian influence graph formed from utility.pdf",
+      "reference_answer": "能够再现级联规模在实用数据中的分布。",
+      "evidence": "The generalized influence graph can reproduce the distribution of cascade size in the utility data."
+    },
+    {
+      "question": "该模型生成的度分布有什么特征？",
+      "expected_document": "A random growth model for power grids and other spatially embedded infrastructure networks.pdf",
+      "reference_answer": "具有指数尾部，并且在度为2时可能出现最大值。",
+      "evidence": "the resulting degree distribution has an exponential tail and may show a maximum at degree two"
+    },
+    {
+      "question": "在SF-network中，每个故障被分配一个值，这个值用于揭示什么？",
+      "expected_document": "A state-failure-network method to identify critical components in power.pdf",
+      "reference_answer": "揭示故障发生后的停电风险（blackout risks）。",
+      "evidence": "each failure is allocated a value that can reveal the blackout risks after their occurrences"
+    },
+    {
+      "question": "Graph-CPS模型基于哪两种神经网络结构？",
+      "expected_document": "A_GNN-Based_Generative_Model_for_Generating_Synthetic_Cyber-Physical_Power_System_Topology.pdf",
+      "reference_answer": "图变分自编码器（graph variational autoencoder）和图循环神经网络（graph recurrent neural networks）。",
+      "evidence": "we propose a generative model, namely Graph-CPS, based on graph variational autoencoder and graph recurrent neural networks"
+    },
+    {
+      "question": "RC算法中术语“malignancy”或“malignant contingency”的定义是什么？",
+      "expected_document": "A_Random_Chemistry_Algorithm_for_Identifying_Collections_of_Multiple_Contingencies_That_Initiate_Cascading_Failure.pdf",
+      "reference_answer": "导致系统故障的最小事故集合（a minimal set of outages that result in system failure）。",
+      "evidence": "we use the phrase “malignancy” or “malignant contingency” to mean a minimal set of outages that result in system failure"
+    },
+    {
+      "question": "该模型包含哪两个主要阶段？",
+      "expected_document": "A_random_growth_model_for_power_grids_and_other_spatially_embedded_infrastructure.pdf",
+      "reference_answer": "初始化阶段（initialization phase）和增长阶段（growth phase）。",
+      "evidence": "It consists of an initialization phase with the network extending tree-like for minimum cost and a growth phase with an attachment rule giving a trade-off between cost-optimization and redundancy"
+    },
+    {
+      "question": "图结构数据在图神经网络中如何表示？",
+      "expected_document": "A_Review_of_Graph_Neural_Networks_and_Their_Applications_in_Power_Systems.pdf",
+      "reference_answer": "图结构数据表示为G=(V, E)，其中E是边集，V是节点集。",
+      "evidence": "Normally, the graph-structured data are represented as G=(V, E), where E is a set of edges and V is a set of nodes"
+    },
+    {
+      "question": "该级联故障模型通过什么方式来模拟动态现象和保护机制？",
+      "expected_document": "AC_Cascading_Failure_Model_for_Resilience_Analysis_in_Power_Networks.pdf",
+      "reference_answer": "该模型使用静态表示来模拟动态现象和保护机制。",
+      "evidence": "It incorporates dynamic phenomena and protection mechanisms using static representations."
+    },
+    {
+      "question": "在提出的算法中，哪个算法使用的p-Cycle数量最少？",
+      "expected_document": "An_Emerging_Survivability_Technology_for_Dispatching_Service_of_Electric_Power_Communication_Network.pdf",
+      "reference_answer": "EpPL-MFIPP算法使用的p-Cycle数量最少。",
+      "evidence": "the EpPL-MFIPP algorithm designed in this paper has the least number of p-Cycles."
+    },
+    {
+      "question": "在Kuramoto-like模型中，传输功率与相位差的关系是什么？",
+      "expected_document": "Analysis_of_a_power_grid_using_a_Kuramoto-like_model.pdf",
+      "reference_answer": "传输功率P_transmitted = -P_MAX sin(Δθ)。",
+      "evidence": "P_transmitted = -P_MAX sin(Δθ)."
+    },
+    {
+      "question": "在直流电网中，Braess悖论在功率流可行性中可能发生在具有至少几个源节点的电网中？",
+      "expected_document": "Braess' paradox for power flow feasibility and parametric uncertainties in DC power grids with constant-power loads.pdf",
+      "reference_answer": "至少两个源节点。",
+      "evidence": "show that this phenomenon can occur in most practical power grids with at least two source nodes."
+    },
+    {
+      "question": "在级联故障模型中，节点j的容量Cj与初始负载Lj的关系式是什么？",
+      "expected_document": "Cascade-based attacks on complex networks.pdf",
+      "reference_answer": "Cj = (1 + α) Lj。",
+      "evidence": "Cj = (1 + α )Lj, j = 1, 2, ...N, (1)"
+    },
+    {
+      "question": "文中提到一个只有100条线路的系统，其3条或更少线路的潜在故障数量是多少？",
+      "expected_document": "Cascading Blackout Severity Prediction with Statistically-Augmented Graph Neural Networks.pdf",
+      "reference_answer": "166,750。",
+      "evidence": "a system with only 100 lines has 166,750 potential failures of 3 or fewer lines."
+    },
+    {
+      "question": "文中认为哪种故障类型比节点故障可能性高一个数量级？",
+      "expected_document": "Cascading blackout severity prediction with statistically-augmented graph.pdf",
+      "reference_answer": "线路故障。",
+      "evidence": "we consider only line failures, as they are an order of magnitude more likely than node outages."
+    },
+    {
+      "question": "在利用GNN预测电网级联故障的任务中，模型训练的目标是什么？",
+      "expected_document": "Cascading Failure Prediction in Power Grid Using Node and Edge Attributed Graph Neural Networks.pdf",
+      "reference_answer": "使用修改后的网络配置文件模拟不同规模的故障，预测级联事件稳定后母线和支路的脆弱性。",
+      "evidence": "The goal is to train GNN models using network profiles modified to simulate contingencies of varying sizes and predict the vulnerability of buses and branches after the cascade event has stabilized."
+    },
+    {
+      "question": "在改进的CML模型中，功能相互依赖通过什么指标来衡量？",
+      "expected_document": "Cascading failures in interdependent transportation networks A.pdf",
+      "reference_answer": "通过扰动后中介中心性和需求的变化来衡量的动态相互作用。",
+      "evidence": "functional interdependence represents dynamic interactions measured by variations in betweenness centrality and demand following disturbances."
+    },
+    {
+      "question": "提出的物理信息图神经网络模型通过什么方法训练以直接遵循物理方程？",
+      "expected_document": "Cascading_Failure_Analysis_Based_on_a_Physics-Informed_Graph_Neural_Network.pdf",
+      "reference_answer": "通过最小化物理信息损失函数并使用预训练/微调方法。",
+      "evidence": "Via minimizing the physics-informed loss function and using a pre-training/fine-tuning method, the proposed model is trained to follow the physical equations directly"
+    },
+    {
+      "question": "在生成IEEE 39-bus系统训练数据时，每个场景最多模拟多少个故障？",
+      "expected_document": "Cascading_Failure_Prediction_in_Power_Grid_Using_Node_and_Edge_Attributed_Graph_Neural_Networks.pdf",
+      "reference_answer": "10个",
+      "evidence": "We use the standard IEEE test cases: 39-bus and 118-bus systems from MATPOWER toolkit in Matlab and generate 5000 scenarios each by simulating at most 10 and 40 failures (approx. 20%) respectively."
+    },
+    {
+      "question": "根据对预故障潮流条件的分析，哪种故障会导致远程功率传输？",
+      "expected_document": "Cascading_Failure_Propagation_and_Mitigation_Strategies_in_Power_Systems.pdf",
+      "reference_answer": "触发本地功率不平衡的故障",
+      "evidence": "We observe that faults triggering local power imbalance would lead to remote power transfer and faults causing no local power imbalance would lead to local power redistribution."
+    },
+    {
+      "question": "文中描述的两种有希望减少停电规模和成本的策略是什么？",
+      "expected_document": "Cascading_failures_in_power_grids.pdf",
+      "reference_answer": "reciprocal altruism（互惠利他主义）和survivability（生存能力）",
+      "evidence": "In this article we described two strategies that hold substantial promise for reducing the size and cost of blackouts. Both “reciprocal altruism” and “survivability” respect the necessarily decentralized nature of power grids."
+    },
+    {
+      "question": "为了验证影响图模型，作者将什么条件下的级联规模分布与影响图进行比较？",
+      "expected_document": "Cascading_Power_Outages_Propagate_Locally_in_an_Influence_Graph_That_is_Not_the_Actual_Grid_Topology.pdf",
+      "reference_answer": "n-2 contingencies（n-2故障）",
+      "evidence": "To validate the model, we compare the distribution of cascade sizes resulting from n − 2 contingencies in a 2896 branch test case to cascade sizes in the influence graph."
+    },
+    {
+      "question": "该框架提供的缓解措施组合如何区分不同风险事件？",
+      "expected_document": "Cascading-Driven_Intentional_Controlled_Islanding_for_Enhancing_Power_Grid_Operational_Resilience.pdf",
+      "reference_answer": "区分尾风险事件和可靠性研究中通常处理的预期（“平均”）事件。",
+      "evidence": "The framework provides a portfolio of mitigation actions proportional to cascading impacts, differentiating between tail-risk events and expected (“average”) events typically addressed in reliability-oriented studies and current industry practices"
+    },
+    {
+      "question": "CensNet通过什么图结构实现节点和边角色的切换？",
+      "expected_document": "CensNet Convolution with Edge-Node Switching in Graph Neural Networks.pdf",
+      "reference_answer": "通过使用原始无向图的线图（line graph）实现节点和边角色的切换。",
+      "evidence": "By using line graph of the original undirected graph, the role of nodes and edges are switched"
+    },
+    {
+      "question": "级联故障根据驱动因素可分为哪三类？",
+      "expected_document": "Coordination of preventive_emergency and restoration dispatch against cascading failures for resilience enhancement.pdf",
+      "reference_answer": "过载主导、协调主导和结构主导的故障。",
+      "evidence": "Cascading faults can be divided into three categories based on the driving factors: overload-dominated, coordination-dominated and structure-dominated failure."
+    },
+    {
+      "question": "将相当于总需求多少比例的功率从关键线路转移到其他线路，可降低级联风险高达80%？",
+      "expected_document": "Dai 等 - 2024 - Risk Assessment and Mitigation of Cascading Failures Using Critical Line Sensitivities.pdf",
+      "reference_answer": "1%",
+      "evidence": "Results show that shifting power equivalent to 1% of total demand from critical lines to other lines can reduce cascading risk by up to 80%."
+    },
+    {
+      "question": "在分层学习优化方法中，采用了哪种深度强化学习算法？",
+      "expected_document": "Deep neural network-based hierarchical learning method for dispatch.pdf",
+      "reference_answer": "DDQN（双深度Q网络）",
+      "evidence": "the adopted DDQN is a discrete-action DRL algorithm"
+    },
+    {
+      "question": "DomiRank中心性中，支配效应的范围通过哪个可调参数进行调节？",
+      "expected_document": "DomiRank Centrality reveals structural fragility of complex networks via node dominance.pdf",
+      "reference_answer": "σ",
+      "evidence": "where the extent of the dominance effect can be modulated through a tuneable parameter ( σ)."
+    },
+    {
+      "question": "在电网级联故障中，什么样的瞬态时间尺度对集体行为的出现起着关键作用？",
+      "expected_document": "Dynamically induced cascading failures in power grids.pdf",
+      "reference_answer": "秒级别（seconds）",
+      "evidence": "We find that transients of the order of seconds in the flows of a power grid play a crucial role in the emergence of collective behaviors."
+    },
+    {
+      "question": "该论文提出的同步条件适用于何种网络参数范围？",
+      "expected_document": "Dynamics_and_control_in_power_grid_and_complex_oscillator_networks.pdf",
+      "reference_answer": "任意互连拓扑和网络参数",
+      "evidence": "Our novel conditions hold for arbitrary interconnection topologies and network parameters"
+    },
+    {
+      "question": "提出的防御策略中，重连操作发生在被攻击节点的什么节点之间？",
+      "expected_document": "Emergent_rewirings_for _cascades_on_correlated_networks.pdf",
+      "reference_answer": "被攻击节点的邻居节点之间",
+      "evidence": "We introduce a defense strategy based on emergent rewirings between neighbors of the attacked node"
+    },
+    {
+      "question": "在ogbn-arxiv数据集的1-shot设置中，ENG模型相比基线模型的性能提升百分比是多少？",
+      "expected_document": "Empower_Text-Attributed_Graphs_Learning_with_Large_Language.pdf",
+      "reference_answer": "76%",
+      "evidence": "in the 1-shot setting of the ogbn-arxiv dataset, ENG achieves a 76% improvement over the baseline model."
+    },
+    {
+      "question": "根据历史数据，停电规模呈现什么分布？",
+      "expected_document": "energies-13-02219-v2.pdf",
+      "reference_answer": "重尾分布（heavy-tailed distribution）",
+      "evidence": "Historical data shows the heavy-tailed distribution of blackout sizes"
+    },
+    {
+      "question": "在级联停电分析中，从第0代到第1代的传播估计值是多少？",
+      "expected_document": "Estimating_the_extent_of_cascading_transmission_line_outages_using_standard_utility_data_and_a_branching_process.pdf",
+      "reference_answer": "0.18",
+      "evidence": "Therefore the generation one propagation is estimated to be 1143/6254 = 0.18."
+    },
+    {
+      "question": "根据实验结果，加强多少比例的支路可以实现超过80%的缓解率？",
+      "expected_document": "Failure_Propagation_Graphs_for_Studying_Cascading_Failure_Propagation_in_Power_Networks.pdf",
+      "reference_answer": "五分之一（one-ﬁfth）",
+      "evidence": "showing that reinforcing one-ﬁfth of the branches can achieve a mitigation rate exceeding 80%."
+    },
+    {
+      "question": "GNN模型在未参与训练的测试数据集上显示的准确率和平衡准确率分别是多少？",
+      "expected_document": "Geometric deep learning for online prediction of cascading failures in power grids.pdf",
+      "reference_answer": "准确率和平衡准确率均高于96%。",
+      "evidence": "The GNN model shows accuracy and balanced accuracy above 96% on selected test datasets not used in the training."
+    },
+    {
+      "question": "FNN模型在未参与训练的测试数据集上显示的准确率和平衡准确率分别是多少？",
+      "expected_document": "Geometric deep learning for online prediction of cascading failures in power.pdf",
+      "reference_answer": "准确率高于85%，平衡准确率高于81%。",
+      "evidence": "Conversely, the FNN shows accuracy above 85% and balanced accuracy above 81% on test datasets unseen during training."
+    },
+    {
+      "question": "在脆弱性评估方法中，对输电支路关键性进行排序所使用的两个标准是什么？",
+      "expected_document": "Gjorgiev和Sansavini - 2022 - Identifying and assessing power system vulnerabilities to transmission asset outages via cascading f.pdf",
+      "reference_answer": "每个支路故障对DNS的影响以及线路过载的频率。",
+      "evidence": "The first objective is achieved by ranking the criticality of the branches using two criteria (i) the impact that each branch failure has on the DNS and (ii) the frequency of line overload."
+    },
+    {
+      "question": "该GNN模型训练时采用哪种学习方式？",
+      "expected_document": "Graph_Neural_Network_Power_Flow_Solver_for_Dynamical_Electrical_Networks.pdf",
+      "reference_answer": "无监督学习。",
+      "evidence": "The training is carried out in an unsupervised manner"
+    },
+    {
+      "question": "ARMA层如何解决ARMA滤波器在节点空间非局部化以及需要计算矩阵逆的问题？",
+      "expected_document": "Graph_Neural_Networks_With_Convolutional_ARMA_Filters.pdf",
+      "reference_answer": "采用递归公式，实现快速分布式实现。",
+      "evidence": "ARMA filters are not localized in node space and require to compute a matrix inversion, which is intractable in the context of GNNs. To address this issue, the proposed ARMA layer relies on a recursive formulation, which leads to a fast and distributed implementation that exploits efficient sparse operations on tensors."
+    },
+    {
+      "question": "GraphEdit通过什么方式来增强大语言模型对图结构的推理能力？",
+      "expected_document": "GraphEdit_Large Language Models for Graph Structure Learning.pdf",
+      "reference_answer": "通过在图结构上进行指令微调。",
+      "evidence": "By enhancing the reasoning capabilities of LLMs through instruction-tuning over graph structures, we aim to overcome the limitations associated with explicit graph structural information and enhance the reliability of graph structure learning."
+    },
+    {
+      "question": "GraphGPT的双阶段指令微调范式探索了哪两种信号？",
+      "expected_document": "GraphGPT_Graph_Instruction_Tuning_for_LLM.pdf",
+      "reference_answer": "自监督图结构信号和任务特定的图指令。",
+      "evidence": "This paradigm explores self-supervised graph structural signals and task-specific graph instructions, to guide LLMs in understanding complex graph structures and improving their adaptability across different downstream tasks."
+    },
+    {
+      "question": "GraphNAS中用于生成图神经网络架构描述的控制器是什么？",
+      "expected_document": "GraphNAS_Distributed_Architecture_Search_for_Graph_Neural_Networks.pdf",
+      "reference_answer": "循环网络。",
+      "evidence": "GraphNAS uses a recurrent network as the controller to generate variable-length strings that describe the architectures of graph neural networks"
+    },
+    {
+      "question": "在提出的框架中，实时搜索故障链的过程被形式化为何种决策过程？",
+      "expected_document": "GRNN-Based_Real-Time_Fault_Chain_Prediction.pdf",
+      "reference_answer": "部分可观测马尔可夫决策过程（POMDP）",
+      "evidence": "The search process is formalized as a partially observable Markov decision process (POMDP)"
+    },
+    {
+      "question": "该研究使用哪种算法实现图卷积网络模型的可解释性？",
+      "expected_document": "Guiding Cascading Failure Search with Interpretable Graph Convolutional Network.pdf",
+      "reference_answer": "层相关性传播（LRP）算法",
+      "evidence": "We further enable the interpretability of the GCN model by a layer-wise relevance propagation (LRP) algorithm"
+    },
+    {
+      "question": "图神经网络的邻域聚合可以看作是对什么集合的聚合函数？",
+      "expected_document": "How powerful are graph networks.pdf",
+      "reference_answer": "多重集（multiset）",
+      "evidence": "the neighbor aggregation in GNNs can be thought of as an aggregation function over the multiset"
+    },
+    {
+      "question": "状态-故障网络（SF-network）方法基于什么指标引导搜索故障和状态？",
+      "expected_document": "Identification_of_Critical_Hidden_Failure_Line_Based_on_State-failure-network.pdf",
+      "reference_answer": "风险估计指标（risk estimation indices）",
+      "evidence": "The SF-network is formed by searching the failures and states guided by risk estimation indices"
+    },
+    {
+      "question": "在异构功率分配方法中，发电机的功率与什么成反比？",
+      "expected_document": "Improve synchronizability of a power grid through power allocation and topology adjustment.pdf",
+      "reference_answer": "与一个由网格拓扑决定的最大范数成反比。",
+      "evidence": "the power of a generator is inversely proportional to a max norm which is decided by the grid topology."
+    },
+    {
+      "question": "用于模拟电力系统同步的摆动方程中，阻尼参数α被设置为多少？",
+      "expected_document": "Improving power-grid systems via topological changes or how self-organized criticality can help power grids.pdf",
+      "reference_answer": "0.4",
+      "evidence": "the dissipation factor α is chosen to be equal to 0.4"
+    },
+    {
+      "question": "在感染引起的级联失效模型中，层a的传播使用什么模型？",
+      "expected_document": "Infection-induced cascading failures – impact and mitigation.pdf",
+      "reference_answer": "SIRP模型",
+      "evidence": "The spreading processes in the two layers are modeled by the SIRP and LTM models, respectively."
+    },
+    {
+      "question": "提出的检测和定位虚假数据注入攻击的方法中，使用了哪种类型的图滤波器？",
+      "expected_document": "Joint_Detection_and_Localization_of_Stealth_False_Data_Injection_Attacks_in_Smart_Grids_Using_Graph_Neural_Networks.pdf",
+      "reference_answer": "自回归移动平均（ARMA）型图滤波器",
+      "evidence": "The proposed approach leverages the auto-regressive moving average (ARMA) type graph filters (GFs)"
+    },
+    {
+      "question": "在机器学习辅助最优潮流研究中，评估了哪两种基本方法？",
+      "expected_document": "Leveraging_Power_Grid_Topology_in_Machine_Learning_Assisted_Optimal_Power_Flow.pdf",
+      "reference_answer": "回归（预测最优发电机设定点）和分类（预测活跃约束集）",
+      "evidence": "assess the performance of a variety of FCNN, CNN and GNN models for two fundamental approaches in this domain: regression (predicting optimal generator set-points) and classification (predicting the active set of constraints)."
+    },
+    {
+      "question": "GPIAN模型相比标准图注意力网络减少了多少比例的模型参数？",
+      "expected_document": "Lightweight model for power grid cascading failures risk evaluation based on graph physics_informed attention network.pdf",
+      "reference_answer": "90.7%",
+      "evidence": "reduces model parameters by 90.7% compared to standard graph attention network"
+    },
+    {
+      "question": "在MATPOWER的数据文件中，每条矩阵行对应什么？",
+      "expected_document": "MATPOWER_Steady-State_Operations_Planning_and_Analysis_Tools_for_Power_Systems_Research_and_Education.pdf",
+      "reference_answer": "单个母线、支路或发电机",
+      "evidence": "In the matrices, each row corresponds to a single bus, branch, or generator."
+    },
+    {
+      "question": "MGCN模型使用什么方法来量化模型分类的贡献因素？",
+      "expected_document": "MGCN利用多图卷积网络解读电力系统在级联故障中的脆弱性.pdf",
+      "reference_answer": "层相关性传播（layer-wise relevance propagation）",
+      "evidence": "present the MGCN using layer-wise relevance propagation and quantify the contributing factors of model classification."
+    },
+    {
+      "question": "2022年北卡罗来纳州电网遭受攻击后，导致了多少人停电？",
+      "expected_document": "Mitigating_Cascading_Effects_in_Large_Adversarial_Graph_Environments.pdf",
+      "reference_answer": "超过45,000人",
+      "evidence": "a 2022 attack on two substations in North Carolina’s electric grid were severely damaged by gunfire within a 10 minute interval, causing a cascade that left more than 45,000 people without power"
+    },
+    {
+      "question": "本文使用哪个IEEE总线系统来验证基于直流潮流的最优负荷削减策略？",
+      "expected_document": "Mitigating_Cascading_Failures_in_Power_Grids_via_Markov_Decision-Based_Load-Shedding_With_DC_Power_Flow_Model.pdf",
+      "reference_answer": "IEEE 118总线系统",
+      "evidence": "Moreover, the optimality of derived policies is validated by a CF simulation based on dc power flow for the IEEE 118 bus system."
+    },
+    {
+      "question": "根据案例星座分析，哪类卫星更容易触发级联故障？",
+      "expected_document": "Modeling_and_Analysis_of_Cascading_Failures_in_LEO_Satellite_Networks.pdf",
+      "reference_answer": "热点区域的卫星",
+      "evidence": "Case constellation analysis reveals that satellites in hotspots are more susceptible to triggering cascading failures."
+    },
+    {
+      "question": "扩展连通性指纹（ECFP）也被称为什么？",
+      "expected_document": "Molecular Graph Convolutions Moving Beyond Fingerprints.pdf",
+      "reference_answer": "圆形指纹或摩根指纹",
+      "evidence": "One of the most common representations in this class is extended-connectivity fingerprints (ECFP), also referred to as circular or Morgan fingerprints"
+    },
+    {
+      "question": "该研究使用了哪种采样方法来估计单节点盆地稳定性？",
+      "expected_document": "Nauck_2022_New_J._Phys._24_043041.pdf",
+      "reference_answer": "Monte-Carlo sampling",
+      "evidence": "estimate SNBS using Monte-Carlo sampling"
+    },
+    {
+      "question": "该研究在多少比例的线路上安装了分布式串联电抗器后仍未发现显著的有益效果？",
+      "expected_document": "Negative_Results_on_Deploying_Distributed_Series_Reactance_Devices_to_Improve_Power_System_Robustness_Against_Cascading_Failures.pdf",
+      "reference_answer": "25%",
+      "evidence": "No major beneficial effect is found, even when 25% of lines are equipped."
+    },
+    {
+      "question": "该论文开发了哪种算法来识别嵌入的Wheatstone结构？",
+      "expected_document": "Network Topologies and Transmission Investment Under .pdf",
+      "reference_answer": "快速启发式算法",
+      "evidence": "develops a fast heuristic algorithm to identify embedded Wheatstone structures"
+    },
+    {
+      "question": "在电力系统中，Wheatstone网络与什么悖论相关？",
+      "expected_document": "Network topologies and transmission.pdf",
+      "reference_answer": "Braess悖论",
+      "evidence": "the Wheatstone network is associated with the Braess Paradox"
+    },
+    {
+      "question": "该论文首次对什么结构在电力网络中的影响进行了定量分析？",
+      "expected_document": "Network_topologies_and_transmi.pdf",
+      "reference_answer": "Wheatstone结构如何影响电力网络中的功率流。",
+      "evidence": "This thesis provides the first quantitative analysis of how the presence of a Wheatstone structure can affect the flow of power through electric networks"
+    },
+    {
+      "question": "该图神经网络求解器在训练过程中直接最小化什么？",
+      "expected_document": "Neural_networks_for_power_flow_Graph_neural_solver.pdf",
+      "reference_answer": "每个母线上基尔霍夫定律的违反。",
+      "evidence": "It learns to perform a power flow computation by directly minimizing the violation of Kirchhoff's law at each bus during training."
+    },
+    {
+      "question": "Graph-EFM生成每个时间步的集合成员需要多少次前向传播？",
+      "expected_document": "NeurIPS-2024-probabilistic-weather-forecasting-with-hierarchical-graph-neural-networks-Paper-Conference.pdf",
+      "reference_answer": "一次。",
+      "evidence": "Requiring only a single forward pass per time step, Graph-EFM allows for fast generation of arbitrarily large ensembles."
+    },
+    {
+      "question": "数值案例研究显示了后扰动电抗调整在什么情况下有效？",
+      "expected_document": "On_Enhancing_Resilience_to_Cascading_Failures_via_Post-Disturbance_Tweaking_of_Line_Reactances.pdf",
+      "reference_answer": "在测试系统中，即使只在少数线路上进行电抗调整，也能有效减少某些场景下的负荷损失。",
+      "evidence": "Our numerical case study suggests that post-disturbance reactance tweaking, even on only a small number of lines, can be effective in reducing the amount of load shed in some scenarios in the tested system."
+    },
+    {
+      "question": "PIDGeuN在损失项中引入了哪个物理定律来确保模型预测的可行性？",
+      "expected_document": "PIDGeuN_GNN-Enabled_Transient_Dynamics_Prediction_of_Networked_Microgrids.pdf",
+      "reference_answer": "基尔霍夫定律",
+      "evidence": "Based on a judiciously designed message passing mechanism, the PIDGeuN incorporates two physics-informed techniques to improve its prediction performance, including a physics-data-infusion approach to determining the inter-dependencies between buses, and a loss term to respect the known physical law of the power system, i.e., the Kirchhoff’s law, to ensure the feasibility of the model prediction."
+    },
+    {
+      "question": "该研究采用什么方法对不脆弱性、可靠性和脆弱性指标进行综合以形成网络性能综合评价指标？",
+      "expected_document": "Power Grid Structure Performance Evaluation Based on Complex Network Cascade Failure Analysis.pdf",
+      "reference_answer": "基于熵的客观赋权法",
+      "evidence": "Finally, a comprehensive network performance evaluation index, which combines the invulnerability, reliability, and vulnerability indicators with an entropy-based objective weighting method, is put forward in this study."
+    },
+    {
+      "question": "该框架将潮流平衡问题定义为什么类型的任务？",
+      "expected_document": "Power_Flow_Balancing_With_Decentralized_Graph_Neural_Networks.pdf",
+      "reference_answer": "监督顶点回归任务",
+      "evidence": "The balancing is framed as a supervised vertex regression task, where the GNN is trained to predict the current and power injections at each grid branch that yield a power flow balance."
+    },
+    {
+      "question": "PowerGraph数据集的生成采用了什么类型的模型？",
+      "expected_document": "PowerGraph_A power grid benchmark dataset_for_graph_neural_networks.pdf",
+      "reference_answer": "基于物理的级联故障模型",
+      "evidence": "The dataset generated via a physics-based cascading failure model ensures the generality of the operating and environmental conditions by spanning diverse failure scenarios."
+    },
+    {
+      "question": "用于估计单节点盆地稳定性的方法是什么？",
+      "expected_document": "Predicting basin stability of power grids using graph neural networks.pdf",
+      "reference_answer": "蒙特卡洛采样",
+      "evidence": "estimate SNBS using Monte-Carlo sampling"
+    },
+    {
+      "question": "在IEEE 39标准测试系统上，该方法的预测准确率是多少？",
+      "expected_document": "Predicting Braess’s paradox of power grids using graph neural networks.pdf",
+      "reference_answer": "93.8%",
+      "evidence": "achieving prediction accuracies of 93.8%, 88.8%, and 88.1%"
+    },
+    {
+      "question": "在该扩散模型中，一个节点的激活只能由什么引起？",
+      "expected_document": "Predicting Cascading Failures with a Hyperparametric Diffusion.pdf",
+      "reference_answer": "其邻居节点",
+      "evidence": "the activation of one node, i.e., transmission line, can only be caused by its neighbors"
+    },
+    {
+      "question": "onset time被分为哪三个类别？",
+      "expected_document": "Predicting_Onset_Time_of_Cascading_Failure_in_Power_Systems_Using_a_Neural_Network-Based_Classifier.pdf",
+      "reference_answer": "urgent、relatively urgent、non-urgent",
+      "evidence": "classifies the onset time into three separate time intervals, corresponding to urgent, relatively urgent, and non-urgent"
+    },
+    {
+      "question": "级联故障传播路径本质上是由什么组成的？",
+      "expected_document": "Predicting_the_Cascading_Failure_Propagation_Path_in_Complex_Networks_Based_On_Attention-LSTM_Neural_Networks.pdf",
+      "reference_answer": "一个由一系列组件故障事件组成的时间序列。",
+      "evidence": "A cascading failure propagation path is in essence a time series that consists of a sequence of component failure events [2]."
+    },
+    {
+      "question": "在Motter-Lai模型中，单个级联步骤的时间复杂度是多少？",
+      "expected_document": "Prediction and mitigation of nonlocal cascading failures using graph.pdf",
+      "reference_answer": "O(N^2 log N)。",
+      "evidence": "In the Motter–Lai (ML) model..., the time complexity is higher, O(N^2 log N), because the shortest paths must be identified for a single cascade step."
+    },
+    {
+      "question": "该文中用什么矩阵来构造权重邻接矩阵？",
+      "expected_document": "Probabilistic_Power_Flow_Solution_with_Graph_Convolutional_Network.pdf",
+      "reference_answer": "阻抗矩阵。",
+      "evidence": "Through construction of the weight adjacency matrix with an impedance matrix, the relationship among nodes is redefined."
+    },
+    {
+      "question": "保护总线路的百分之多少可以将最严重停电类型的可能性降低5到20倍？",
+      "expected_document": "Protecting the Texas power grid from tropical cyclones.pdf",
+      "reference_answer": "1%。",
+      "evidence": "protecting only 1% of total lines can reduce the likelihood of the most destructive type of outages by a factor of between 5 and 20."
+    },
+    {
+      "question": "在稳态级联故障模型中，通常选择的两种特定故障机制是什么？",
+      "expected_document": "Quantification_of_Cascading_Failure_Propagation_in_Power_Systems.pdf",
+      "reference_answer": "过载输电线路跳闸和电压不稳定事件。",
+      "evidence": "Among these models, two specific failure mechanisms are commonly selected: overload transmission line tripping and voltage instability events [4], [5]."
+    },
+    {
+      "question": "该文提出的级联故障风险评估框架中，考虑了哪种因素对可再生能源发电机的影响？",
+      "expected_document": "Real-Time_Cascading_Failure_Risk_Evaluation_With_High_Penetration_of_Renewable_Energy_Based_on_a_Graph_Convolutional_Network.pdf",
+      "reference_answer": "过/欠电压。",
+      "evidence": "In our work, a novel evaluation framework with high efficiency and accuracy is proposed, where the influence of over/under-voltage on renewable energy generators is considered during the cascading failure risk evaluation process."
+    },
+    {
+      "question": "该文使用哪种深度强化学习算法来训练底层策略？",
+      "expected_document": "RL cascade falure.pdf",
+      "reference_answer": "近端策略优化（Proximal Policy Optimization）。",
+      "evidence": "Proximal Policy Optimization algorithm is then adapted for the training of underlying policies."
+    },
+    {
+      "question": "在连锁故障仿真模型中，潮流再分配包括哪两个阶段？",
+      "expected_document": "RLcascadefalure翻译.pdf",
+      "reference_answer": "一次调频和直流潮流计算。",
+      "evidence": "电网中潮流的再分配包括两个阶段，即一次调频和直流潮流计算。"
+    },
+    {
+      "question": "在文中，哪种类型的拆除策略可能比仅基于拓扑标准的策略产生更具破坏性的效果？",
+      "expected_document": "Robustness and resilience of complex.pdf",
+      "reference_answer": "基于任务依赖的拆除策略",
+      "evidence": "a task-dependent dismantling policy on some networks could produce more devastating effects than one based only on topological criteria."
+    },
+    {
+      "question": "在安全关键场景下，GNN模型在较大电网中因价格变化导致母线潮流误差增加多少数量级？",
+      "expected_document": "Safety-aware Evaluation of GNN.pdf",
+      "reference_answer": "六个数量级",
+      "evidence": "with bus power flow errors escalating by up to six orders of magnitude for larger grids."
+    },
+    {
+      "question": "在提出的方法中，采用什么算法来增强GCN模型的可解释性？",
+      "expected_document": "Searching_for_Critical_Power_System_Cascading_Failures_With_Graph_Convolutional_Network.pdf",
+      "reference_answer": "层间相关性传播算法",
+      "evidence": "We further enable the interpretability of the GCN model by a layerwise relevance propagation algorithm."
+    },
+    {
+      "question": "动态策略形成的是什么？",
+      "expected_document": "Sequential recovery of power system in cascading failure based on Recovery Probability Matrix.pdf",
+      "reference_answer": "自适应恢复链",
+      "evidence": "This Dynamic strategy forms an adaptive recovery chain, where each decision is guided by the current network state and influences subsequent actions."
+    },
+    {
+      "question": "文中提出的模型在初始化阶段如何扩展网络？",
+      "expected_document": "shk网络.pdf",
+      "reference_answer": "网络以树状扩展，目的是最小化成本。",
+      "evidence": "It consists of an initialization phase with the network extending tree-like for minimum cost"
+    },
+    {
+      "question": "该模型使用什么网络来捕捉空间依赖关系？",
+      "expected_document": "Short-term load forecasting using spatial-temporal embedding graph.pdf",
+      "reference_answer": "一种新颖的指数移动平均图卷积网络（EMA-GCN）。",
+      "evidence": "Then we utilize a novel exponential moving average graph convolutional network (EMA-GCN) to capture the spatial dependencies."
+    },
+    {
+      "question": "该LSTM框架是在什么数据上进行测试的？",
+      "expected_document": "Short-Term_Residential_Load_Forecasting_Based_on_LSTM_Recurrent_Neural_Network.pdf",
+      "reference_answer": "一组公开的真实居民智能电表数据。",
+      "evidence": "The proposed framework is tested on a publicly available set of real residential smart meter data"
+    },
+    {
+      "question": "信号传播的几何由哪两个因素共同决定？",
+      "expected_document": "Signal propagation in complex networks.pdf",
+      "reference_answer": "网络拓扑和节点间非线性相互作用的形式。",
+      "evidence": "The geometry of signal propagation is determined as much by the network topology as it is by the diverse forms of nonlinear interactions that may take place between the nodes."
+    },
+    {
+      "question": "SimBench数据集提供了哪些电压等级的数据？",
+      "expected_document": "SimBench_Benchmark_Datasetof_powerSystem.pdf",
+      "reference_answer": "SimBench提供了低、中、高和超高电压等级的数据集。",
+      "evidence": "SimBench, a comprehensive dataset for the low, medium, high and extra-high voltage level, is presented."
+    },
+    {
+      "question": "该论文对于VSG在弱电网连接下的稳定性得出了什么结论？",
+      "expected_document": "Small-Disturbance_Stability_of_a_Wind_Farm_With_Virtual_Synchronous_Generators_Under_the_Condition_of_Weak_Grid_Connection.pdf",
+      "reference_answer": "VSG在弱电网连接下不受失稳风险影响。",
+      "evidence": "generally concludes that the grid-connected VSG is immune to the instability risk under the condition of weak grid connection."
+    },
+    {
+      "question": "在New England电网模型上，稀疏促进控制器仅使用多少个广域通信链路就达到了接近最优集中控制的性能？",
+      "expected_document": "Sparsity-Promoting_Optimal_Wide-Area_Control_of_Power_Networks.pdf",
+      "reference_answer": "仅使用一个广域通信链路。",
+      "evidence": "We use the New England power grid model to demonstrate that the proposed combination of the sparsity-promoting control design with the slow coherency objectives performs almost as well as the optimal centralized control while only making use of a single wide-area communication link."
+    },
+    {
+      "question": "该框架在捕捉不同房屋的空间依赖性时是否需要房屋的地理信息先验知识？",
+      "expected_document": "Spatial-Temporal_Residential_Short-Term_Load_Forecasting_via_Graph_Neural_Networks.pdf",
+      "reference_answer": "不需要。",
+      "evidence": "The proposed framework can capture the hidden spatial dependencies of different houses without even any prior knowledge requirement on the geographic information for these houses."
+    },
+    {
+      "question": "在提出的级联故障模型中，使用什么方法来跟踪稳态电压分布以检测电压不稳定事件？",
+      "expected_document": "Steady-State_Cascading_Failure_Model_With_Voltage_Instability_Event_Detection.pdf",
+      "reference_answer": "连续潮流（continuation power flow, CPF）",
+      "evidence": "To detect voltage instability events, we track the steady-state voltage profiles across successive cascade generations by adopting continuation power flow (CPF)."
+    },
+    {
+      "question": "在提出的随机级联故障模型中，使用什么变换来估计流动过程的不确定性？",
+      "expected_document": "Stochastic_Cascading_Failure_Model_With_Uncertain_Generation_Using_Unscented_Transform.pdf",
+      "reference_answer": "无迹变换（unscented transform, UT）",
+      "evidence": "Abstract—This paper proposes a novel stochastic cascading failure (CF) model with full ac power flow using the unscented transform (UT) for power girds vulnerability analysis."
+    },
+    {
+      "question": "根据该研究，强化百分之多少的输电线路可以将最破坏性停电的可能性降低5到20倍？",
+      "expected_document": "Stürmer 等 - 2024 - Increasing the resilience of the Texas power grid against extreme storms by hardening critical lines.pdf",
+      "reference_answer": "1%",
+      "evidence": "we show that hardening only 1% of total lines can reduce the likelihood of the most destructive type of outage by a factor of between 5 and 20."
+    },
+    {
+      "question": "在归一化CASCADE模型中，每个组件上的初始负载服从什么分布？",
+      "expected_document": "System_Reliability_Under_Cascading_Failure_Models.pdf",
+      "reference_answer": "独立均匀随机变量，范围固定",
+      "evidence": "The initial load on each component is an -independent uniform random variable over a fixed range of loading."
+    },
+    {
+      "question": "在竞争网络模型中，作者定义了一个什么守恒定律？",
+      "expected_document": "The cost of attack in competing networks.pdf",
+      "reference_answer": "a conservation law that relates the feedback mechanism to the resilience dynamics for two competing networks.",
+      "evidence": "We define a conservation law that relates the feedback mechanism to the resilience dynamics for two competing networks."
+    },
+    {
+      "question": "该研究生成的新动态稳定性数据集比之前的数据集大多少倍？",
+      "expected_document": "Toward_dynamic_stability_assessment_of_power_grid_topologies_using_graph_neural_networks.pdf",
+      "reference_answer": "ten times larger",
+      "evidence": "We generate new datasets that are ten times larger than previous ones"
+    },
+    {
+      "question": "网络科学被美国国家研究委员会认定为新的基础研究领域是在哪一年？",
+      "expected_document": "Two Decades of Network Science.pdf",
+      "reference_answer": "2005",
+      "evidence": "It can be regarded as a new academic field since 2005 when the U.S. National Research Council defined network science as a new field of basic research"
+    },
+    {
+      "question": "Braess悖论最初是在什么系统中被描述的？",
+      "expected_document": "Understanding Braess’ Paradox in power grids.pdf",
+      "reference_answer": "traffic networks",
+      "evidence": "first described half a century ago by Dietrich Braess for traffic networks"
+    },
+    {
+      "question": "关于BTM太阳能集成，模型揭示的临界集成水平是多少？",
+      "expected_document": "Xu 等 - 2025 - Quantifying cascading power outages during climate extremes considering renewable energy integration.pdf",
+      "reference_answer": "低于45%的集成水平（包括当前水平）对系统弹性影响极小，但超过该临界水平且未配备储能时，会加剧灾难性停电的概率。",
+      "evidence": "lower integration levels (below 45%, including the current level) exhibit minimal impact on system resilience in this event. However, surpassing this critical level without pairing it with energy storage can exacerbate the probability of catastrophic blackouts."
+    }
+  ],
+  "failures": [
+    {
+      "filename": "NeuralNetworkd.pdf",
+      "stage": "extract",
+      "error": "可提取文本少于300字"
+    },
+    {
+      "filename": "南方电网虚拟电厂发展与产业部署专题报告.docx",
+      "stage": "extract",
+      "error": "File is not a zip file"
+    },
+    {
+      "filename": "网络科学引论.pdf",
+      "stage": "extract",
+      "error": "可提取文本少于300字"
+    },
+    {
+      "filename": "2024最新大数据开发面试笔记_6.0.pdf",
+      "stage": "quality_review",
+      "error": "PDF中文正文提取乱码，无法可靠验证专业问题，需要OCR或替换源文件"
+    }
+  ]
+}

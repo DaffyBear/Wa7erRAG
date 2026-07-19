@@ -19,16 +19,22 @@ class EvaluationSummary:
     mrr: float
 
 
-async def evaluate(dataset_path: Path) -> EvaluationSummary:
+async def evaluate(dataset_path: Path, tenant_slug: str = "default") -> EvaluationSummary:
     cases = json.loads(dataset_path.read_text(encoding="utf-8"))
-    retriever = get_container().rag.retriever
+    container = get_container()
+    tenant = await container.security.repository.get_tenant_by_slug(tenant_slug)
+    if tenant is None:
+        raise ValueError(f"Unknown tenant slug: {tenant_slug}")
+    retriever = container.rag.retriever
     hits = {1: 0, 5: 0, 10: 0, 20: 0}
     reciprocal_rank = 0.0
     original_final_top_k = retriever.final_top_k
     retriever.final_top_k = 20
     try:
         for case in cases:
-            results = await retriever.retrieve(case["question"])
+            results = await retriever.retrieve(
+                case["question"], tenant_id=tenant.tenant_id
+            )
             expected = case["expected_document"]
             rank = next(
                 (
@@ -55,8 +61,10 @@ async def evaluate(dataset_path: Path) -> EvaluationSummary:
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset", type=Path)
+    parser.add_argument("--tenant-slug", default="default")
     args = parser.parse_args()
-    print(json.dumps(asdict(await evaluate(args.dataset)), ensure_ascii=False, indent=2))
+    summary = await evaluate(args.dataset, tenant_slug=args.tenant_slug)
+    print(json.dumps(asdict(summary), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

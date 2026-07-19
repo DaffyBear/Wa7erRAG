@@ -66,6 +66,7 @@ class Reranker(Protocol):
 
 class QueryRewriter(Protocol):
     async def rewrite(self, query: str, history: Sequence[dict[str, str]]) -> str: ...
+    def stream(self, query: str, history: Sequence[dict[str, str]]) -> AsyncIterator[str]: ...
 
 
 class HydeGenerator(Protocol):

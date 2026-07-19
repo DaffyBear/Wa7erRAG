@@ -83,6 +83,7 @@ data/test-runs/
 *.db
 *.sqlite
 *.sqlite3
+dump.rdb
 *.zip
 *.tar
 *.tar.gz
@@ -94,3 +95,6 @@ compose.override.yaml
 compose.override.yml
 docker-compose.override.yaml
 docker-compose.override.yml
+
+# Local TypeScript build metadata
+*.tsbuildinfo

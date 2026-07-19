@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+from collections.abc import AsyncIterator, Sequence
 
 import httpx
 
@@ -16,6 +17,10 @@ class HeuristicQueryRewriter:
         )
         topic = previous_user.strip().rstrip("？?")
         return f"基于上一轮关于“{topic}”的讨论，{query.strip()}" if topic else query.strip()
+    async def stream(
+        self, query: str, history: Sequence[dict[str, str]]
+    ) -> AsyncIterator[str]:
+        yield await self.rewrite(query, history)
 
 
 class OpenAICompatibleQueryRewriter:
@@ -25,18 +30,90 @@ class OpenAICompatibleQueryRewriter:
         self.model = model
         self.timeout = timeout
 
-    async def rewrite(self, query: str, history: Sequence[dict[str, str]]) -> str:
-        prompt = "结合对话历史，将最后的问题改写为完整、自包含的检索问题。只输出改写结果。"
-        messages = [
-            {"role": "system", "content": prompt},
-            *history[-8:],
-            {"role": "user", "content": query},
+    def _request(self, query: str, history: Sequence[dict[str, str]]) -> dict[str, object]:
+        prompt = (
+            "你是检索词改写器，不是问答助手。\n"
+            "你的唯一任务是把用户最后一句话改写成一个完整、自包含的检索问题。\n"
+            "只能输出改写后的一个问题，不能回答问题，不能解释原因，不能输出步骤、结论、摘要、引用或客套话。\n"
+            "如果原问题已经完整，原样输出；如果是寒暄或不需要改写，原样输出。\n"
+            "保留用户原本的疑问意图，不要替用户补充答案。"
+        )
+        context = [
+            {"role": "user", "content": item.get("content", "")}
+            for item in history[-12:]
+            if item.get("role") == "user" and item.get("content")
         ]
+        return {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": prompt},
+                *context,
+                {
+                    "role": "user",
+                    "content": f"只改写下面的问题，不要回答：\n{query}",
+                },
+            ],
+            "temperature": 0,
+            "max_tokens": 128,
+        }
+
+    async def rewrite(self, query: str, history: Sequence[dict[str, str]]) -> str:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "messages": messages, "temperature": 0},
+                json=self._request(query, history),
             )
             response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+        return clean_rewrite_output(response.json()["choices"][0]["message"]["content"], query)
+
+    async def stream(
+        self, query: str, history: Sequence[dict[str, str]]
+    ) -> AsyncIterator[str]:
+        payload = self._request(query, history) | {"stream": True}
+        parts: list[str] = []
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json=payload,
+            ) as response:
+                if response.is_error:
+                    body = (await response.aread()).decode(errors="replace")
+                    raise RuntimeError(
+                        f"Rewrite gateway returned {response.status_code}: {body[:2000]}"
+                    )
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except ValueError:
+                        continue
+                    delta = event.get("choices", [{}])[0].get("delta", {}).get("content")
+                    if delta:
+                        parts.append(delta)
+        cleaned = clean_rewrite_output("".join(parts), query)
+        yield cleaned
+
+def clean_rewrite_output(raw: str, original_query: str) -> str:
+    cleaned = raw.strip()
+    if not cleaned:
+        return original_query.strip()
+    if "</think>" in cleaned:
+        cleaned = cleaned.rsplit("</think>", 1)[-1].strip()
+    if cleaned.startswith("```") and cleaned.endswith("```"):
+        cleaned = cleaned.strip("`").strip()
+    for prefix in ("改写结果：", "改写后的问题：", "检索问题：", "Query:", "Rewritten query:"):
+        if cleaned.lower().startswith(prefix.lower()):
+            cleaned = cleaned[len(prefix):].strip()
+            break
+    if "\n" in cleaned:
+        cleaned = cleaned.splitlines()[0].strip()
+    if len(cleaned) > max(300, len(original_query.strip()) * 8):
+        return original_query.strip()
+    return cleaned or original_query.strip()

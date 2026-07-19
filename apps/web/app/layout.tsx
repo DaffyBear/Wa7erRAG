@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Enterprise RAG",
-  description: "Production-oriented enterprise knowledge assistant",
+  title: "Wa7er RAG",
+  description: "knowledge assistant",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

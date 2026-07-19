@@ -62,8 +62,20 @@ class Settings(BaseSettings):
     rag_hnsw_ef_search: int = 64
     model_gateway_base_url: str = "http://localhost:9000/v1"
     model_gateway_api_key: str = "change-me"
+    embedding_gateway_base_url: str | None = None
+    embedding_gateway_api_key: str | None = None
     rerank_endpoint: str = "http://localhost:9010/rerank"
     rerank_api_key: str = ""
+    rerank_timeout_seconds: float = Field(default=10.0, gt=0)
+    rerank_max_retries: int = Field(default=2, ge=0, le=10)
+    rerank_retry_base_delay_seconds: float = Field(default=0.25, ge=0)
+    rerank_retry_max_delay_seconds: float = Field(default=2.0, ge=0)
+    rerank_max_concurrency: int = Field(default=8, ge=1)
+    rerank_queue_timeout_seconds: float = Field(default=2.0, gt=0)
+    rerank_circuit_failure_threshold: int = Field(default=5, ge=1)
+    rerank_circuit_recovery_seconds: float = Field(default=30.0, gt=0)
+    rerank_max_document_chars: int = Field(default=12000, ge=1)
+    rerank_fallback_provider: Literal["none", "lexical"] = "lexical"
     milvus_uri: str = "http://localhost:19530"
     milvus_collection: str = "enterprise_knowledge_tenant_v1"
     postgres_dsn: str = "postgresql+asyncpg://rag:rag@localhost:5432/rag"

@@ -1,9 +1,11 @@
+import json
 from dataclasses import asdict
 
 from app.api.dependencies import enforce_chat_rate_limit, require_permission
 from app.core.container import get_container
 from app.schemas.chat import ChatRequest, ChatResponse, CitationResponse, SessionHistoryResponse
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import StreamingResponse
 from rag_core.security import Permission, SecurityPrincipal
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -42,6 +44,50 @@ async def chat(
         timings_ms=answer.timings_ms,
     )
 
+@router.post("/stream", dependencies=[Depends(enforce_chat_rate_limit)])
+async def stream_chat(
+    request: ChatRequest,
+    http_request: Request,
+    principal: SecurityPrincipal = Depends(require_permission(Permission.CHAT_USE)),
+) -> StreamingResponse:
+    async def events():
+        message_id = ""
+        session_id = request.session_id or ""
+        citation_count = 0
+        try:
+            async for event in get_container().rag.stream_answer(
+                request.query,
+                [item.model_dump() for item in request.history],
+                request.session_id,
+                principal.tenant_id,
+                principal.user_id,
+            ):
+                if event["type"] == "done":
+                    message_id = str(event["message_id"])
+                    session_id = str(event["session_id"])
+                    citation_count = len(event["citations"])
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except Exception as error:
+            yield json.dumps(
+                {"type": "error", "message": str(error)}, ensure_ascii=False
+            ) + "\n"
+            return
+        await get_container().security.audit(
+            principal,
+            "chat.answer.stream",
+            "message",
+            message_id,
+            ip_address=_ip(http_request),
+            user_agent=http_request.headers.get("user-agent", ""),
+            request_id=http_request.state.request_id,
+            details={"session_id": session_id, "citation_count": citation_count},
+        )
+
+    return StreamingResponse(
+        events(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @router.get("/sessions/{session_id}", response_model=SessionHistoryResponse)
 async def session_history(

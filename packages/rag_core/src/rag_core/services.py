@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,7 @@ from rag_core.contracts import (
     TraceRepository,
     VectorStore,
 )
-from rag_core.generation import replace_asset_urls
+from rag_core.generation import citations_from_answer, replace_asset_urls
 from rag_core.metrics import FEEDBACK_COUNT, INGESTED_DOCUMENTS, STAGE_LATENCY
 from rag_core.models import Citation, Feedback, GeneratedAnswer, IngestionResult, MessageTrace
 from rag_core.retrieval import ParentDocumentRetriever
@@ -204,17 +205,26 @@ class RagService:
         variants: list[str] = []
         if use_retrieval:
             started = time.perf_counter()
-            rewritten = await self.rewriter.rewrite(query, effective_history)
-            timings["rewrite"] = _elapsed(started)
-            if query.strip() != rewritten.strip():
-                variants.append(query)
-            if self.hyde_enabled:
+            try:
+                rewritten = await self.rewriter.rewrite(query, effective_history)
+            except Exception:
+                rewritten = query.strip()
+                timings["rewrite_fallback"] = _elapsed(started)
+            else:
+                timings["rewrite"] = _elapsed(started)
+                if query.strip() != rewritten.strip():
+                    variants.append(query)
+            if self.hyde_enabled and _should_run_hyde(rewritten):
                 started = time.perf_counter()
-                with STAGE_LATENCY.labels(stage="hyde_generation").time():
-                    hypothetical_answer = await self.hyde_generator.generate(rewritten)
-                timings["hyde_generation"] = _elapsed(started)
-                if hypothetical_answer:
-                    variants.append(hypothetical_answer)
+                try:
+                    with STAGE_LATENCY.labels(stage="hyde_generation").time():
+                        hypothetical_answer = await self.hyde_generator.generate(rewritten)
+                except Exception:
+                    timings["hyde_fallback"] = _elapsed(started)
+                else:
+                    timings["hyde_generation"] = _elapsed(started)
+                    if hypothetical_answer:
+                        variants.append(hypothetical_answer)
         else:
             timings["direct_answer_route"] = 1.0
 
@@ -261,6 +271,11 @@ class RagService:
                     "score": item.score,
                     "matched_routes": item.metadata.get("matched_routes", []),
                     "rrf_score": item.metadata.get("rrf_score", 0.0),
+                    "rerank_provider": item.metadata.get("rerank_provider", ""),
+                    "rerank_model": item.metadata.get("rerank_model", ""),
+                    "rerank_fallback_reason": item.metadata.get(
+                        "rerank_fallback_reason", ""
+                    ),
                 }
                 for item in contexts
             ]
@@ -293,6 +308,202 @@ class RagService:
         )
         return message_id, actual_session_id, generated
 
+    async def stream_answer(
+        self,
+        query: str,
+        history: list[dict[str, str]],
+        session_id: str | None = None,
+        tenant_id: str = "default",
+        user_id: str = "system",
+    ) -> AsyncIterator[dict[str, Any]]:
+        actual_session_id = session_id or uuid.uuid4().hex
+        scoped_session_id = f"{tenant_id}:{user_id}:{actual_session_id}"
+        stored_history = await self.session_store.get_history(scoped_session_id, limit=20)
+        effective_history = history or stored_history
+        timings: dict[str, float] = {}
+
+        use_retrieval = _should_use_retrieval(query)
+        if use_retrieval and await self.retriever.vector_store.count(tenant_id) == 0:
+            use_retrieval = False
+        rewritten = query.strip()
+        variants: list[str] = []
+        yield {
+            "type": "start",
+            "session_id": actual_session_id,
+            "rewritten_query": rewritten,
+            "use_retrieval": use_retrieval,
+            "hyde_enabled": self.hyde_enabled,
+        }
+
+        if use_retrieval:
+            started = time.perf_counter()
+            try:
+                rewrite_parts: list[str] = []
+                stream_rewrite = getattr(self.rewriter, "stream", None)
+                if callable(stream_rewrite):
+                    async for content in stream_rewrite(query, effective_history):
+                        rewrite_parts.append(content)
+                        yield {"type": "rewrite_delta", "content": content}
+                    rewritten = "".join(rewrite_parts).strip() or query.strip()
+                else:
+                    rewritten = await self.rewriter.rewrite(query, effective_history)
+            except Exception:
+                rewritten = query.strip()
+                rewrite_stage = "rewrite_fallback"
+            else:
+                rewrite_stage = "rewrite"
+                if query.strip() != rewritten.strip():
+                    variants.append(query)
+            timings[rewrite_stage] = _elapsed(started)
+            yield {
+                "type": "timing",
+                "stage": rewrite_stage,
+                "duration_ms": timings[rewrite_stage],
+            }
+            yield {"type": "rewrite", "rewritten_query": rewritten}
+
+            if self.hyde_enabled and _should_run_hyde(rewritten):
+                started = time.perf_counter()
+                try:
+                    with STAGE_LATENCY.labels(stage="hyde_generation").time():
+                        hypothetical_answer = await self.hyde_generator.generate(rewritten)
+                except Exception:
+                    hyde_stage = "hyde_fallback"
+                else:
+                    hyde_stage = "hyde_generation"
+                    if hypothetical_answer:
+                        variants.append(hypothetical_answer)
+                timings[hyde_stage] = _elapsed(started)
+                yield {
+                    "type": "timing",
+                    "stage": hyde_stage,
+                    "duration_ms": timings[hyde_stage],
+                }
+        else:
+            timings["direct_answer_route"] = 1.0
+            yield {
+                "type": "timing",
+                "stage": "direct_answer_route",
+                "duration_ms": timings["direct_answer_route"],
+            }
+
+        route = "rag" if use_retrieval else "direct"
+        cache_key = f"rag:answer:{route}:{tenant_id}:{stable_id(rewritten, *variants)}"
+        cached = await self.cache.get_json(cache_key)
+        contexts = []
+
+        if isinstance(cached, dict):
+            answer_text = str(cached["answer"])
+            citations = [Citation(**item) for item in cached.get("citations", [])]
+            timings["cache_hit"] = 1.0
+            yield {
+                "type": "timing",
+                "stage": "cache_hit",
+                "duration_ms": timings["cache_hit"],
+            }
+            if answer_text:
+                yield {"type": "delta", "content": answer_text}
+        else:
+            if use_retrieval:
+                started = time.perf_counter()
+                with STAGE_LATENCY.labels(stage="retrieval_rerank").time():
+                    contexts = await self.retriever.retrieve(rewritten, variants, tenant_id)
+                timings["retrieval_rerank"] = _elapsed(started)
+                yield {
+                    "type": "timing",
+                    "stage": "retrieval_rerank",
+                    "duration_ms": timings["retrieval_rerank"],
+                }
+
+            started = time.perf_counter()
+            first_token_recorded = False
+            answer_parts: list[str] = []
+            with STAGE_LATENCY.labels(stage="generation").time():
+                async for content in self.generator.stream(
+                    rewritten, contexts, effective_history
+                ):
+                    if not first_token_recorded:
+                        timings["first_token"] = _elapsed(started)
+                        first_token_recorded = True
+                        yield {
+                            "type": "timing",
+                            "stage": "first_token",
+                            "duration_ms": timings["first_token"],
+                        }
+                    answer_parts.append(content)
+                    yield {"type": "delta", "content": content}
+            timings["generation"] = _elapsed(started)
+            yield {
+                "type": "timing",
+                "stage": "generation",
+                "duration_ms": timings["generation"],
+            }
+            answer_text = "".join(answer_parts)
+            citations = citations_from_answer(answer_text, contexts)
+            await self.cache.set_json(
+                cache_key,
+                {
+                    "answer": answer_text,
+                    "citations": [asdict(item) for item in citations],
+                },
+                self.cache_ttl_seconds,
+            )
+
+        timings["total"] = round(
+            sum(value for stage, value in timings.items() if stage != "first_token"), 3
+        )
+        yield {
+            "type": "timing",
+            "stage": "total",
+            "duration_ms": timings["total"],
+        }
+        message_id = uuid.uuid4().hex
+        retrieved_documents = (
+            [
+                {
+                    "document_id": item.document_id,
+                    "filename": item.filename,
+                    "score": item.score,
+                    "matched_routes": item.metadata.get("matched_routes", []),
+                    "rrf_score": item.metadata.get("rrf_score", 0.0),
+                    "rerank_provider": item.metadata.get("rerank_provider", ""),
+                    "rerank_model": item.metadata.get("rerank_model", ""),
+                    "rerank_fallback_reason": item.metadata.get(
+                        "rerank_fallback_reason", ""
+                    ),
+                }
+                for item in contexts
+            ]
+            if contexts
+            else [asdict(item) for item in citations]
+        )
+        await self.traces.save_message(
+            MessageTrace(
+                message_id=message_id,
+                session_id=actual_session_id,
+                query=query,
+                rewritten_query=rewritten,
+                answer=answer_text,
+                retrieved_documents=retrieved_documents,
+                timings_ms=timings,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
+        )
+        await self.session_store.append_message(
+            scoped_session_id, "user", query, self.session_ttl_seconds
+        )
+        await self.session_store.append_message(
+            scoped_session_id, "assistant", answer_text, self.session_ttl_seconds
+        )
+        yield {
+            "type": "done",
+            "message_id": message_id,
+            "session_id": actual_session_id,
+            "rewritten_query": rewritten,
+            "citations": [asdict(item) for item in citations],
+            "timings_ms": timings,
+        }
     async def get_session_history(
         self, session_id: str, tenant_id: str = "default", user_id: str = "system"
     ) -> list[dict[str, str]]:
@@ -327,8 +538,36 @@ def _elapsed(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
 
 
+def _should_run_hyde(text: str) -> bool:
+    normalized = text.strip()
+    if not normalized:
+        return False
+    cjk_count = len([character for character in normalized if "\u4e00" <= character <= "\u9fff"])
+    if cjk_count:
+        return cjk_count >= 20
+    word_count = len(normalized.split())
+    return word_count >= 25
+
 def _should_use_retrieval(query: str) -> bool:
     normalized = "".join(query.strip().lower().split())
+    model_metadata_markers = (
+        "你是什么模型",
+        "你用的什么模型",
+        "你的模型是什么",
+        "你的模型版本",
+        "当前模型是什么",
+        "模型名称是什么",
+        "知识截止时间",
+        "知识更新到什么时候",
+        "知识库时间到哪",
+        "知识库更新到什么时候",
+        "训练数据截止",
+        "knowledgecutoff",
+        "whatmodelareyou",
+        "whichmodelareyou",
+    )
+    if any(marker in normalized for marker in model_metadata_markers):
+        return False
     conversational = {
         "你好",
         "您好",

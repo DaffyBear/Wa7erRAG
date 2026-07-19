@@ -1,4 +1,4 @@
-﻿# Enterprise RAG
+# Enterprise RAG
 
 面向企业内部技术文档的生产型 Retrieval-Augmented Generation（RAG）系统。项目覆盖文档治理、清洗、双格式导出、语义增强、向量入库、多路召回、父文档扩展、模型精排、答案生成、引用追踪、多租户安全、反馈闭环、离线评测和容器化部署。
 
@@ -370,6 +370,22 @@ scripts\run_api.cmd
 scripts\run_web.cmd
 ```
 
+### Windows 一键启停
+
+当前本地生产配置可以通过以下脚本统一管理 PostgreSQL 检查、Redis、Milvus、Attu、API 和 Web：
+
+```bat
+scripts\start_all.cmd
+```
+
+停止项目服务：
+
+```bat
+scripts\stop_all.cmd
+```
+
+启动脚本使用固定端口：Web `3000`、API `8000`、Attu `8001`、Milvus `19530`。日志写入 `tmp\runtime\logs`。停止脚本不会关闭 PostgreSQL，避免影响其他数据库。
+
 ## 运行模式
 
 项目支持两种配置方式。
@@ -472,6 +488,16 @@ RAG_RERANK_PROVIDER=http
 RAG_RERANK_MODEL=your-rerank-model
 RERANK_ENDPOINT=https://rerank-provider.example.com/v1/rerank
 RERANK_API_KEY=replace-with-rerank-api-key
+RERANK_TIMEOUT_SECONDS=10
+RERANK_MAX_RETRIES=2
+RERANK_RETRY_BASE_DELAY_SECONDS=0.25
+RERANK_RETRY_MAX_DELAY_SECONDS=2
+RERANK_MAX_CONCURRENCY=8
+RERANK_QUEUE_TIMEOUT_SECONDS=2
+RERANK_CIRCUIT_FAILURE_THRESHOLD=5
+RERANK_CIRCUIT_RECOVERY_SECONDS=30
+RERANK_MAX_DOCUMENT_CHARS=12000
+RERANK_FALLBACK_PROVIDER=lexical
 ```
 
 HTTP Rerank 服务需要接受：
@@ -485,6 +511,22 @@ HTTP Rerank 服务需要接受：
   "return_documents": false
 }
 ```
+
+工程化客户端具备以下保护：
+
+- 复用 HTTP 连接池，避免每次请求重新建立连接。
+- 使用信号量限制并发请求数。
+- 排队超过 `RERANK_QUEUE_TIMEOUT_SECONDS` 时直接降级。
+- 对网络异常、超时、`408/425/429/5xx` 执行指数退避重试。
+- 优先遵循服务端 `Retry-After`。
+- 连续失败达到阈值后开启熔断器。
+- 熔断恢复窗口结束后只允许单个 Half-Open 探测请求。
+- 服务不可用、响应格式错误或熔断开启时降级到词法精排。
+- 截断过长候选文档，控制请求大小和远端推理成本。
+- 将远端或降级来源、模型名称和降级原因写入检索轨迹。
+- 暴露调用结果、重试、降级、熔断状态、延迟和候选数量指标。
+
+将 `RERANK_FALLBACK_PROVIDER` 设置为 `none` 可以关闭降级，此时远端精排失败会向上抛出错误。生产环境推荐保持 `lexical`。
 
 并返回类似：
 
@@ -842,7 +884,8 @@ deploy/monitoring/prometheus.yml
 - Milvus 查询耗时与内存使用。
 - Redis 命中率和连接状态。
 - PostgreSQL 连接池状态。
-- Rerank 延迟和错误率。
+- Rerank 远端成功、失败、重试、降级、排队超时和熔断状态。
+- Rerank 远端与降级延迟以及候选数量分布。
 - 模型 Token 消耗。
 - 无召回率、点踩率和 Bad Case 数量。
 
@@ -980,7 +1023,7 @@ git grep -n "replace-with-real-secret"
 - 为 PostgreSQL、Redis、Milvus 和 MinIO 开启认证与网络隔离。
 - 使用 HTTPS。
 - 限制上传文件大小和允许的扩展名。
-- 为模型网关和 Rerank 服务设置超时、重试、熔断和配额。
+- 为模型网关补充超时、重试、熔断和降级策略。
 - 定期轮换所有外部服务密钥。
 - 不要将真实内部文档、评测集或用户反馈提交到公开仓库。
 

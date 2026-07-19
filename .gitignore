@@ -98,3 +98,6 @@ docker-compose.override.yml
 
 # Local TypeScript build metadata
 *.tsbuildinfo
+
+# Private local guidance
+科研指导skill.md

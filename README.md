@@ -1,5 +1,20 @@
 # Enterprise RAG
 
+## Product Preview
+
+### Login
+
+![Login screen](docs/images/login-screen.png)
+
+### Chat Workspace — Empty State
+
+![Chat workspace before conversation](docs/images/chat-empty-screen.png)
+
+### Chat Workspace — Conversation
+
+![Chat workspace with RAG response](docs/images/chat-conversation-screen.png)
+
+
 面向企业内部技术文档的生产型 Retrieval-Augmented Generation（RAG）系统。项目覆盖文档治理、清洗、双格式导出、语义增强、向量入库、多路召回、父文档扩展、模型精排、答案生成、引用追踪、多租户安全、反馈闭环、离线评测和容器化部署。
 
 本项目不依赖 LangChain 或 LlamaIndex 等通用 RAG 编排框架，核心链路使用可替换的接口和轻量服务层实现，便于控制每个数据处理阶段、定位检索问题并按实际业务需求调整策略。

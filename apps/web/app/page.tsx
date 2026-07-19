@@ -593,26 +593,30 @@ export default function HomePage() {
         <section className="auth-stage">
           <div className="auth-story">
             <div className="brand-lockup">
-              <span className="brand-mark">W</span>
+              <span className="brand-mark">🤪</span>
               <span>Wa7er RAG</span>
             </div>
             <div className="auth-story-copy">
-              <p className="eyebrow">Wa7er's SOUL</p>
+              <p className="eyebrow"></p>
               <h1>
-                Better than being each other's world,
+                <span className="universe-glow">Better than being</span>
                 <br />
-                <span className="universe-glow">be your own universe.</span>
+                <span className="universe-glow">each other's world,</span>
+                <br />
+                <span className="universe-glow">be your own</span>
+                <br />
+                <span className="universe-glow">universe.</span>
               </h1>
-              <p>Knowledge should feel clear, quiet, and close at hand.</p>
+              <p></p>
             </div>
-            <p className="auth-footnote">Private knowledge workspace</p>
+            <p className="auth-footnote"></p>
           </div>
 
           <form className="auth-card" onSubmit={submitLogin}>
             <div className="auth-card-heading">
-              <p className="eyebrow">ENTERPRISE RAG</p>
-              <h2>Sign in to your workspace</h2>
-              <p className="auth-help">Use your tenant account to continue.</p>
+              <p className="eyebrow">WELCOME BACK!</p>
+              <h2>Login</h2>
+              <p className="auth-help"></p>
             </div>
             <div className="auth-fields">
               <label>
@@ -693,7 +697,7 @@ export default function HomePage() {
       </header>
 
       <section className="workspace-heading">
-        <p className="eyebrow">By Miao Chen</p>
+        <p className="eyebrow"></p>
         <h1>Wa7er's Planet</h1>
         <p>Only then will you stop treating your growth as an accident.</p>
       </section>

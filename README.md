@@ -1,4 +1,4 @@
-# Enterprise RAG
+# WA7ER RAG
 
 ## Product Preview
 

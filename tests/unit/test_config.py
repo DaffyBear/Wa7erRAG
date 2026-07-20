@@ -5,9 +5,14 @@ def test_production_defaults_match_documented_architecture() -> None:
     settings = Settings(_env_file=None)
 
     assert settings.rag_embedding_dimension == 1024
+    assert settings.rag_router_enabled is True
+    assert settings.rag_router_model == "deepseek-v4-flash"
+    assert settings.rag_router_timeout_seconds == 5.0
     assert settings.rag_chunk_size == 6000
     assert settings.rag_chunk_overlap == 500
     assert settings.rag_vector_top_k == 20
+    assert settings.rag_hybrid_search_enabled is True
+    assert settings.rag_lexical_top_k == 20
     assert settings.rag_hnsw_m == 16
     assert settings.rag_hnsw_ef_construction == 256
     assert settings.rerank_timeout_seconds == 10.0
@@ -15,6 +20,7 @@ def test_production_defaults_match_documented_architecture() -> None:
     assert settings.rerank_max_concurrency == 8
     assert settings.rerank_circuit_failure_threshold == 5
     assert settings.rerank_fallback_provider == "lexical"
+
 
 def test_component_providers_can_override_mock_mode() -> None:
     settings = Settings(

@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type FormEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -35,11 +36,30 @@ type LoginForm = {
 
 type TimingMap = Record<string, number>;
 
+type ChatSession = {
+  session_id: string;
+  title: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type SessionMessage = {
+  message_id: string;
+  query: string;
+  answer: string;
+  rewritten_query: string;
+  citations: Citation[];
+  timings_ms: TimingMap;
+};
+
 const apiBase =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const tokenStorageKey = "enterprise-rag-access-token";
+const activeSessionStorageKey = "enterprise-rag-active-session";
 
 const timingOrder = [
+  "retrieval_router",
   "rewrite",
   "hyde_generation",
   "retrieval_rerank",
@@ -51,6 +71,7 @@ const timingOrder = [
 ];
 
 const timingLabels: Record<string, string> = {
+  retrieval_router: "Retrieval router",
   rewrite: "Rewrite",
   hyde_generation: "HyDE",
   retrieval_rerank: "Retrieval / Rerank",
@@ -241,17 +262,57 @@ export default function HomePage() {
   const [lyricLine, setLyricLine] = useState(0);
   const [lyricChar, setLyricChar] = useState(0);
   const [sendSplash, setSendSplash] = useState(false);
+  const [currentAnswerIndex, setCurrentAnswerIndex] = useState(0);
+  const [answerIndexDraft, setAnswerIndexDraft] = useState("");
+  const [answerNavigatorHovered, setAnswerNavigatorHovered] = useState(false);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionActionId, setSessionActionId] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
+  const programmaticScrollRef = useRef(false);
+  const lastScrollYRef = useRef(0);
+  const touchYRef = useRef<number | null>(null);
   const authHeaders = useMemo(
     () => (token ? { Authorization: `Bearer ${token}` } : {}),
     [token],
   );
+  const totalAnswers = useMemo(
+    () => messages.filter((message) => message.role === "user").length,
+    [messages],
+  );
+  const questionIndexByMessage = useMemo(() => {
+    const indexes = new Map<number, number>();
+    let questionIndex = 0;
+    messages.forEach((message, messageIndex) => {
+      if (message.role === "user") {
+        questionIndex += 1;
+        indexes.set(messageIndex, questionIndex);
+      }
+    });
+    return indexes;
+  }, [messages]);
   const currentLyric = lyrics[lyricLine] ?? "";
   const visibleLyric = Array.from(currentLyric)
     .slice(0, lyricChar)
     .join("");
+
+  const jumpToAnswer = useCallback(
+    (requestedIndex: number) => {
+      if (!totalAnswers) return;
+      const targetIndex = Math.min(Math.max(Math.trunc(requestedIndex), 1), totalAnswers);
+      const target = document.querySelector<HTMLElement>(
+        `[data-question-index="${targetIndex}"]`,
+      );
+      if (!target) return;
+      followRef.current = false;
+      setCurrentAnswerIndex(targetIndex);
+      setAnswerIndexDraft(String(targetIndex));
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [totalAnswers],
+  );
 
   useEffect(() => {
     fetch("/content/lyrics.md")
@@ -287,23 +348,126 @@ export default function HomePage() {
   }, [currentLyric, lyricChar, lyricLine, lyrics]);
 
   useEffect(() => {
-    const onScroll = () => {
-      followRef.current =
-        document.documentElement.scrollHeight -
-          window.innerHeight -
-          window.scrollY <
-        80;
+    const updateCurrentAnswer = () => {
+      const anchors = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-question-index]"),
+      );
+      if (!anchors.length) {
+        setCurrentAnswerIndex(0);
+        return;
+      }
+      if (busy && followRef.current && totalAnswers) {
+        setCurrentAnswerIndex(totalAnswers);
+        return;
+      }
+      const referenceLine = 120;
+      let visibleIndex = Number(anchors[0].dataset.questionIndex ?? 1);
+      for (const anchor of anchors) {
+        if (anchor.getBoundingClientRect().top <= referenceLine) {
+          visibleIndex = Number(anchor.dataset.questionIndex ?? visibleIndex);
+        } else {
+          break;
+        }
+      }
+      setCurrentAnswerIndex(visibleIndex);
     };
 
+    const onScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (
+        busy &&
+        !programmaticScrollRef.current &&
+        currentScrollY < lastScrollYRef.current
+      ) {
+        followRef.current = false;
+      }
+      lastScrollYRef.current = currentScrollY;
+      updateCurrentAnswer();
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (busy && event.deltaY < 0) followRef.current = false;
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      touchYRef.current = event.touches[0]?.clientY ?? null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const currentY = event.touches[0]?.clientY;
+      if (
+        busy &&
+        currentY !== undefined &&
+        touchYRef.current !== null &&
+        currentY > touchYRef.current
+      ) {
+        followRef.current = false;
+      }
+      touchYRef.current = currentY ?? null;
+    };
+
+    lastScrollYRef.current = window.scrollY;
     window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    updateCurrentAnswer();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [busy, messages, totalAnswers]);
 
   useEffect(() => {
-    if (busy && followRef.current) {
-      endRef.current?.scrollIntoView({ behavior: "auto" });
+    if (!totalAnswers) {
+      setCurrentAnswerIndex(0);
+      setAnswerIndexDraft("");
+      return;
     }
+    setCurrentAnswerIndex((value) =>
+      busy && followRef.current
+        ? totalAnswers
+        : Math.min(Math.max(value || 1, 1), totalAnswers),
+    );
+  }, [busy, totalAnswers]);
+
+  useEffect(() => {
+    if (!answerNavigatorHovered || !totalAnswers) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key !== "w" && key !== "s") return;
+      event.preventDefault();
+      const baseIndex = currentAnswerIndex || 1;
+      jumpToAnswer(key === "w" ? baseIndex - 1 : baseIndex + 1);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [answerNavigatorHovered, currentAnswerIndex, jumpToAnswer, totalAnswers]);
+
+  useEffect(() => {
+    if (!busy || !followRef.current) return;
+
+    programmaticScrollRef.current = true;
+    endRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        lastScrollYRef.current = window.scrollY;
+        programmaticScrollRef.current = false;
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [busy, messages]);
 
   useEffect(() => {
@@ -326,9 +490,11 @@ export default function HomePage() {
 
   function clearAuthentication() {
     window.localStorage.removeItem(tokenStorageKey);
+    window.localStorage.removeItem(activeSessionStorageKey);
     setToken(null);
     setSessionId(null);
     setMessages([]);
+    setChatSessions([]);
     setTimings({});
     setPipelineStatus("--");
   }
@@ -343,6 +509,143 @@ export default function HomePage() {
     if (response.status === 401) clearAuthentication();
     return response;
   }
+
+  const resetConversation = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setTimings({});
+    setPipelineStatus("--");
+    setCurrentAnswerIndex(0);
+    setAnswerIndexDraft("");
+    followRef.current = true;
+  }, []);
+
+  const openSession = useCallback(
+    async (targetSessionId: string, accessToken = token) => {
+      if (!accessToken) return;
+      setSessionActionId(targetSessionId);
+      try {
+        const response = await fetch(
+          `${apiBase}/chat/sessions/${targetSessionId}/detail`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (response.status === 401) {
+          clearAuthentication();
+          return;
+        }
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        const restored: Message[] = [];
+        (data.messages as SessionMessage[]).forEach((item) => {
+          restored.push({ role: "user", content: item.query });
+          restored.push({
+            role: "assistant",
+            content: item.answer,
+            rewritten:
+              item.rewritten_query.trim() === item.query.trim()
+                ? "/"
+                : item.rewritten_query,
+            citations: item.citations,
+            messageId: item.message_id,
+          });
+        });
+        setSessionId(targetSessionId);
+        setMessages(restored);
+        setTimings(
+          data.messages.length
+            ? data.messages[data.messages.length - 1].timings_ms
+            : {},
+        );
+        setPipelineStatus(data.messages.length ? "Completed" : "--");
+        setCurrentAnswerIndex(data.messages.length);
+        setAnswerIndexDraft("");
+        followRef.current = false;
+        window.localStorage.setItem(activeSessionStorageKey, targetSessionId);
+        window.requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+      } finally {
+        setSessionActionId(null);
+      }
+    },
+    [token],
+  );
+
+  const loadSessions = useCallback(
+    async (accessToken = token, restoreActive = false) => {
+      if (!accessToken) return;
+      setSessionsLoading(true);
+      try {
+        const response = await fetch(`${apiBase}/chat/sessions`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (response.status === 401) {
+          clearAuthentication();
+          return;
+        }
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        const sessions = data.sessions as ChatSession[];
+        setChatSessions(sessions);
+        if (restoreActive && sessions.length) {
+          const storedId = window.localStorage.getItem(activeSessionStorageKey);
+          const target = sessions.some((item) => item.session_id === storedId)
+            ? storedId
+            : sessions[0].session_id;
+          if (target) await openSession(target, accessToken);
+        }
+      } finally {
+        setSessionsLoading(false);
+      }
+    },
+    [openSession, token],
+  );
+
+  function startNewChat() {
+    if (busy) return;
+    window.localStorage.removeItem(activeSessionStorageKey);
+    resetConversation();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function renameChatSession(item: ChatSession) {
+    const title = window.prompt("Rename conversation", item.title)?.trim();
+    if (!title || title === item.title) return;
+    const response = await authenticatedFetch(
+      `${apiBase}/chat/sessions/${item.session_id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      },
+    );
+    if (!response.ok) return;
+    const renamed = (await response.json()) as ChatSession;
+    setChatSessions((current) =>
+      current.map((session) =>
+        session.session_id === renamed.session_id ? renamed : session,
+      ),
+    );
+  }
+
+  async function deleteChatSession(item: ChatSession) {
+    if (!window.confirm(`Delete "${item.title}"?`)) return;
+    const response = await authenticatedFetch(
+      `${apiBase}/chat/sessions/${item.session_id}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) return;
+    const remaining = chatSessions.filter(
+      (session) => session.session_id !== item.session_id,
+    );
+    setChatSessions(remaining);
+    if (sessionId !== item.session_id) return;
+    window.localStorage.removeItem(activeSessionStorageKey);
+    resetConversation();
+    if (remaining.length) await openSession(remaining[0].session_id);
+  }
+  useEffect(() => {
+    if (!token) return;
+    void loadSessions(token, true);
+  }, [loadSessions, token]);
 
   async function submitLogin(event: FormEvent) {
     event.preventDefault();
@@ -388,6 +691,8 @@ export default function HomePage() {
     const assistantIndex = messages.length + 1;
 
     followRef.current = true;
+    setCurrentAnswerIndex(totalAnswers + 1);
+    setAnswerIndexDraft("");
     setMessages((current) => [
       ...current,
       { role: "user", content: text },
@@ -418,7 +723,9 @@ export default function HomePage() {
 
       const applyEvent = (event: Record<string, unknown>) => {
         if (event.type === "start") {
-          setSessionId(String(event.session_id));
+          const activeSessionId = String(event.session_id);
+          setSessionId(activeSessionId);
+          window.localStorage.setItem(activeSessionStorageKey, activeSessionId);
           setPipelineStatus("Processing");
           return;
         }
@@ -442,7 +749,10 @@ export default function HomePage() {
               index === assistantIndex
                 ? {
                     ...message,
-                    rewritten: String(event.rewritten_query ?? ""),
+                    rewritten:
+                      String(event.rewritten_query ?? "").trim() === text.trim()
+                        ? "/"
+                        : String(event.rewritten_query ?? ""),
                   }
                 : message,
             ),
@@ -475,23 +785,53 @@ export default function HomePage() {
         }
 
         if (event.type === "done") {
+          const completedSessionId = String(event.session_id);
+          const completedAt = new Date().toISOString();
           setPipelineStatus("Completed");
-          setSessionId(String(event.session_id));
+          setSessionId(completedSessionId);
+          setChatSessions((current) => {
+            const existing = current.find(
+              (item) => item.session_id === completedSessionId,
+            );
+            const completedSession: ChatSession = existing
+              ? {
+                  ...existing,
+                  message_count: existing.message_count + 1,
+                  updated_at: completedAt,
+                }
+              : {
+                  session_id: completedSessionId,
+                  title: text.slice(0, 80),
+                  message_count: 1,
+                  created_at: completedAt,
+                  updated_at: completedAt,
+                };
+            return [
+              completedSession,
+              ...current.filter(
+                (item) => item.session_id !== completedSessionId,
+              ),
+            ];
+          });
           if (event.timings_ms) setTimings(event.timings_ms as TimingMap);
           setMessages((current) =>
             current.map((message, index) =>
               index === assistantIndex
                 ? {
                     ...message,
-                    rewritten: String(
-                      event.rewritten_query ?? message.rewritten ?? "",
-                    ),
+                    rewritten:
+                      String(event.rewritten_query ?? "").trim() === text.trim()
+                        ? "/"
+                        : String(
+                            event.rewritten_query ?? message.rewritten ?? "",
+                          ),
                     citations: event.citations as Citation[],
                     messageId: String(event.message_id),
                   }
                 : message,
             ),
           );
+          void loadSessions();
           return;
         }
 
@@ -580,7 +920,7 @@ export default function HomePage() {
     return (
       <main className="auth-shell">
         <div className="auth-loading">
-          <span className="brand-mark">W</span>
+          <span className="brand-mark">?</span>
           <p>Preparing workspace...</p>
         </div>
       </main>
@@ -703,6 +1043,69 @@ export default function HomePage() {
       </section>
 
       <div className="conversation-layout">
+        <aside className="session-rail" aria-label="Conversation history">
+          <div className="session-rail-heading">
+            <div>
+              <p className="eyebrow">History</p>
+              <h2>Conversations</h2>
+            </div>
+            <button
+              className="new-chat-button"
+              type="button"
+              onClick={startNewChat}
+              disabled={busy}
+              aria-label="New chat"
+            >
+              +
+            </button>
+          </div>
+          <div className="session-list">
+            {sessionsLoading && !chatSessions.length ? (
+              <p className="session-empty">Loading...</p>
+            ) : chatSessions.length ? (
+              chatSessions.map((item) => (
+                <div
+                  className={`session-item ${sessionId === item.session_id ? "active" : ""}`}
+                  key={item.session_id}
+                >
+                  <button
+                    className="session-open"
+                    type="button"
+                    onClick={() => void openSession(item.session_id)}
+                    disabled={busy || sessionActionId === item.session_id}
+                  >
+                    <span className="session-title">{item.title}</span>
+                    <span className="session-meta">
+                      {item.message_count} {item.message_count === 1 ? "answer" : "answers"}
+                    </span>
+                  </button>
+                  <div className="session-actions">
+                    <button
+                      type="button"
+                      onClick={() => void renameChatSession(item)}
+                      aria-label={`Rename ${item.title}`}
+                      title="Rename"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteChatSession(item)}
+                      aria-label={`Delete ${item.title}`}
+                      title="Delete"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="session-empty">No conversations yet</p>
+            )}
+          </div>
+          <p className="session-rail-note">Your conversations are saved automatically.</p>
+        </aside>
+
         <div className="conversation-main">
           <section className="chat" aria-live="polite">
             {messages.length === 0 && (
@@ -714,13 +1117,13 @@ export default function HomePage() {
                 <h2>Your question?</h2>
                 <p>You can ask something that touches the soul.</p>
                 <div className="prompt-examples">
-                  <button type="button" onClick={() => setQuery("How do I configure the system?")}>
+                  <button type="button" onClick={() => setQuery("Was it I who missed freedom all along, or was freedom never something that required waiting?")}>
                     Freedom
                   </button>
-                  <button type="button" onClick={() => setQuery("What should I pay attention to?")}>
+                  <button type="button" onClick={() => setQuery("Is faith a truth meant to be believed, or merely an illusion meant to sustain me through this life?")}>
                     Faith
                   </button>
-                  <button type="button" onClick={() => setQuery("Help me find the relevant document.")}>
+                  <button type="button" onClick={() => setQuery("Is loneliness a prison where no one understands you, or a pilgrimage each soul is born to walk alone?")}>
                     Solitude
                   </button>
                 </div>
@@ -732,6 +1135,7 @@ export default function HomePage() {
                 <article
                   className={`message ${message.role}`}
                   key={`${message.role}-${index}`}
+                  data-question-index={questionIndexByMessage.get(index)}
                 >
                   <div className="message-meta">
                     <span className="avatar">{message.role === "user" ? "🤣" : "😅"}</span>
@@ -787,7 +1191,7 @@ export default function HomePage() {
                           message.feedbackState === "fading" ? "fading" : ""
                         }`}
                       >
-                        <span>Was this helpful?</span>
+                        <span>Was this helpful ?</span>
                         <button type="button" onClick={() => feedback(message.messageId!, 1)}>
                           Helpful
                         </button>
@@ -839,8 +1243,9 @@ export default function HomePage() {
           </form>
         </div>
 
-        <aside className="timing-panel" aria-live="polite">
-          <div className="timing-panel-heading">
+        <div className="right-rail">
+          <aside className="timing-panel" aria-live="polite">
+            <div className="timing-panel-heading">
             <div>
               <p className="eyebrow">Reply Metrics</p>
               <h2>Pipeline</h2>
@@ -860,10 +1265,55 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-          <p className="timing-note">
-            Each response records the time spent across the retrieval pipeline.
-          </p>
-        </aside>
+            <p className="timing-note">
+              Each response records the time spent across the retrieval pipeline.
+            </p>
+          </aside>
+
+          <aside
+            className="answer-navigator"
+            aria-label="Answer navigator"
+            onMouseEnter={() => setAnswerNavigatorHovered(true)}
+            onMouseLeave={() => setAnswerNavigatorHovered(false)}
+          >
+            <span className="answer-navigator-label">Answers</span>
+            <div className="answer-navigator-count">
+              {totalAnswers ? (
+                <>
+                  <input
+                    aria-label="Current answer number"
+                    inputMode="numeric"
+                    min={1}
+                    max={totalAnswers}
+                    type="number"
+                    value={
+                      answerIndexDraft || String(currentAnswerIndex || 1)
+                    }
+                    onChange={(event) =>
+                      setAnswerIndexDraft(event.currentTarget.value)
+                    }
+                    onFocus={(event) => {
+                      setAnswerIndexDraft(String(currentAnswerIndex || 1));
+                      event.currentTarget.select();
+                    }}
+                    onBlur={() => setAnswerIndexDraft("")}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter") return;
+                      event.preventDefault();
+                      jumpToAnswer(Number(event.currentTarget.value));
+                      event.currentTarget.blur();
+                    }}
+                  />
+                  <span>/</span>
+                  <span>{totalAnswers}</span>
+                </>
+              ) : (
+                <span>-/-</span>
+              )}
+            </div>
+            <span className="answer-navigator-hint">Hover : W / S</span>
+          </aside>
+        </div>
       </div>
     </main>
   );

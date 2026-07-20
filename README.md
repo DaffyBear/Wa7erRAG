@@ -2,6 +2,8 @@
 
 ## Product Preview
 
+> 页面风格仅为作者个人喜好；历史会话栏中的内容仅用于作者试验，不包含其他特别暗示。
+
 ### Login
 
 ![Login screen](docs/images/login-screen.png)
@@ -81,9 +83,11 @@
 
 ### 检索与生成
 
-- Query Rewrite：将多轮指代问题改写为自包含问题。
+- Retrieval Router：规则优先，模糊问题由轻量模型仅输出 `needs_retrieval` JSON，异常时默认检索。
+- Query Rewrite：仅在路由决定检索后，将多轮指代问题改写为自包含问题。
 - HyDE：生成假设答案作为额外检索查询。
 - 原问题、改写问题和 HyDE 查询多路向量召回。
+- Milvus 原生 BM25 词法召回，与 Dense 结果按文档级 RRF 融合。
 - 使用 Reciprocal Rank Fusion（RRF）融合多路检索结果。
 - 父文档扩展：任意 Chunk 命中后，拉取该文档全部 Chunk 并按 `chunk_index` 重组。
 - Milvus HNSW 向量索引与 Embedding 维度校验。
@@ -562,6 +566,11 @@ HTTP Rerank 服务需要接受：
 | `RAG_CHUNK_SIZE` | `6000` | 长文档 Chunk 大小 |
 | `RAG_CHUNK_OVERLAP` | `500` | Chunk 重叠长度 |
 | `RAG_VECTOR_TOP_K` | `20` | 每路向量召回数量 |
+| `RAG_ROUTER_ENABLED` | `true` | 是否启用检索路由 |
+| `RAG_ROUTER_MODEL` | `deepseek-v4-flash` | 检索路由模型，仅输出布尔 JSON |
+| `RAG_ROUTER_TIMEOUT_SECONDS` | `5` | 路由请求超时，失败时默认检索 |
+| `RAG_HYBRID_SEARCH_ENABLED` | `true` | 是否启用 Dense + BM25 混合检索 |
+| `RAG_LEXICAL_TOP_K` | `20` | 每路 BM25 召回数量 |
 | `RAG_RERANK_CANDIDATE_COUNT` | `20` | Rerank 候选数量 |
 | `RAG_FINAL_TOP_K` | `5` | 最终生成上下文数量 |
 | `RAG_HYDE_ENABLED` | `true` | 是否启用 HyDE |
@@ -627,11 +636,21 @@ scripts\start_milvus.cmd
 ```env
 RAG_VECTOR_STORE_PROVIDER=milvus
 MILVUS_URI=http://localhost:19530
-MILVUS_COLLECTION=enterprise_knowledge_v1
+MILVUS_COLLECTION=enterprise_knowledge_hybrid_v2
+RAG_HYBRID_SEARCH_ENABLED=true
+RAG_LEXICAL_TOP_K=20
 RAG_EMBEDDING_DIMENSION=1024
 ```
 
-Collection 包含向量字段和用于父文档召回的标量字段。系统会校验 Collection 向量维度，避免不同 Embedding 模型产生的向量混入同一 Collection。
+Collection 同时包含 Dense 向量字段、由 Milvus BM25 Function 自动生成的 Sparse 向量字段，以及父文档召回所需的标量字段。系统会校验 Dense 维度及 BM25 Schema，旧 Collection 不兼容时会明确要求迁移，不会静默降级为纯向量检索。
+
+旧 Collection 可直接复制已有 Dense 向量，无需重新调用 Embedding API：
+
+```powershell
+scripts\migrate_milvus_hybrid.cmd --source enterprise_knowledge_tenant_v1 --target enterprise_knowledge_hybrid_v2
+```
+
+迁移完成并验证后，将本地 `.env` 的 `MILVUS_COLLECTION` 切换为新 Collection。BM25 仅使用原问题与 Rewrite 查询，HyDE 仅参与 Dense 检索，避免假设答案稀释精确词匹配。
 
 ### MinIO
 

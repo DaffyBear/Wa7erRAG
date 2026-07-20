@@ -68,3 +68,103 @@ async def test_rerank_candidates_are_capped_after_route_fusion() -> None:
     results = await retriever.retrieve("MQTT configuration", ["MQTT setup"])
     assert reranker.candidate_count == 5
     assert len(results) == 3
+
+
+@pytest.mark.asyncio
+async def test_bm25_route_recalls_exact_identifier() -> None:
+    embedder = DeterministicHashEmbedder(64)
+    store = InMemoryVectorStore()
+    chunks = [
+        DocumentChunk(
+            "exact",
+            "exact-doc",
+            "errors.md",
+            0,
+            "设备返回错误码 E_CONN_1042，需要检查证书链。",
+            "无关的向量嵌入文本",
+        ),
+        DocumentChunk(
+            "semantic",
+            "semantic-doc",
+            "network.md",
+            0,
+            "网络连接失败的通用处理方法。",
+            "E_CONN_1042 E_CONN_1042 E_CONN_1042",
+        ),
+    ]
+    await store.ensure_schema(64)
+    await store.upsert(chunks, await embedder.embed([item.embedding_text for item in chunks]))
+    retriever = ParentDocumentRetriever(
+        embedder,
+        store,
+        LexicalReranker(),
+        vector_top_k=1,
+        lexical_top_k=2,
+        final_top_k=2,
+    )
+
+    results = await retriever.retrieve("E_CONN_1042")
+
+    exact = next(item for item in results if item.document_id == "exact-doc")
+    assert "bm25_query" in exact.metadata["matched_routes"]
+    assert exact.metadata["bm25_score"] > 0
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_can_be_disabled() -> None:
+    embedder = DeterministicHashEmbedder(64)
+    store = InMemoryVectorStore()
+    chunks = [
+        DocumentChunk("a", "a", "a.md", 0, "ONLY_BM25_TOKEN", "semantic target"),
+        DocumentChunk("b", "b", "b.md", 0, "other", "ONLY_BM25_TOKEN"),
+    ]
+    await store.ensure_schema(64)
+    await store.upsert(chunks, await embedder.embed([item.embedding_text for item in chunks]))
+    retriever = ParentDocumentRetriever(
+        embedder,
+        store,
+        LexicalReranker(),
+        vector_top_k=1,
+        final_top_k=2,
+        hybrid_enabled=False,
+    )
+
+    results = await retriever.retrieve("ONLY_BM25_TOKEN")
+
+    assert all(not item.metadata["lexical_variants"] for item in results)
+    assert all(
+        not any(route.startswith("bm25") for route in item.metadata["matched_routes"])
+        for item in results
+    )
+
+
+@pytest.mark.asyncio
+async def test_bm25_search_respects_tenant_scope() -> None:
+    embedder = DeterministicHashEmbedder(64)
+    store = InMemoryVectorStore()
+    chunks = [
+        DocumentChunk(
+            "tenant-a",
+            "doc-a",
+            "a.md",
+            0,
+            "共享错误码 X900",
+            "a",
+            {"tenant_id": "tenant-a"},
+        ),
+        DocumentChunk(
+            "tenant-b",
+            "doc-b",
+            "b.md",
+            0,
+            "共享错误码 X900",
+            "b",
+            {"tenant_id": "tenant-b"},
+        ),
+    ]
+    await store.ensure_schema(64)
+    await store.upsert(chunks, await embedder.embed([item.embedding_text for item in chunks]))
+
+    hits = await store.lexical_search("X900", 10, tenant_id="tenant-a")
+
+    assert [hit.chunk.document_id for hit in hits] == ["doc-a"]

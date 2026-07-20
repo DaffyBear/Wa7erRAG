@@ -31,12 +31,18 @@ class MilvusVectorStore:
         await asyncio.to_thread(self._ensure_schema, embedding_dimension)
 
     def _ensure_schema(self, embedding_dimension: int) -> None:
-        from pymilvus import DataType, MilvusClient
+        from pymilvus import DataType, Function, FunctionType, MilvusClient
 
         if self.client.has_collection(self.collection_name):
             description = self.client.describe_collection(self.collection_name)
             field_names = {field["name"] for field in description["fields"]}
-            required_fields = {"embedding", "tenant_id", "document_id", "chunk_id"}
+            required_fields = {
+                "embedding",
+                "sparse_embedding",
+                "tenant_id",
+                "document_id",
+                "chunk_id",
+            }
             missing_fields = required_fields - field_names
             if missing_fields:
                 raise ValueError(
@@ -63,16 +69,37 @@ class MilvusVectorStore:
         schema.add_field("tenant_id", DataType.VARCHAR, max_length=64)
         schema.add_field("filename", DataType.VARCHAR, max_length=512)
         schema.add_field("chunk_index", DataType.INT64)
-        schema.add_field("content", DataType.VARCHAR, max_length=65535)
+        schema.add_field(
+            "content",
+            DataType.VARCHAR,
+            max_length=65535,
+            enable_analyzer=True,
+            analyzer_params={"type": "chinese"},
+        )
         schema.add_field("embedding_text", DataType.VARCHAR, max_length=65535)
         schema.add_field("metadata_json", DataType.JSON)
         schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=embedding_dimension)
+        schema.add_field("sparse_embedding", DataType.SPARSE_FLOAT_VECTOR)
+        schema.add_function(
+            Function(
+                name="content_bm25",
+                function_type=FunctionType.BM25,
+                input_field_names=["content"],
+                output_field_names=["sparse_embedding"],
+            )
+        )
         index_params = self.client.prepare_index_params()
         index_params.add_index(
             field_name="embedding",
             index_type="HNSW",
             metric_type="COSINE",
             params={"M": self.hnsw_m, "efConstruction": self.ef_construction},
+        )
+        index_params.add_index(
+            field_name="sparse_embedding",
+            index_type="SPARSE_INVERTED_INDEX",
+            metric_type="BM25",
+            params={"inverted_index_algo": "DAAT_MAXSCORE"},
         )
         index_params.add_index(field_name="document_id", index_type="INVERTED")
         index_params.add_index(field_name="tenant_id", index_type="INVERTED")
@@ -136,6 +163,33 @@ class MilvusVectorStore:
         )
         return [
             VectorHit(_row_to_chunk(item["entity"]), float(item["distance"])) for item in result[0]
+        ]
+
+    async def lexical_search(
+        self, query: str, limit: int, tenant_id: str = "default"
+    ) -> list[VectorHit]:
+        result = await asyncio.to_thread(
+            self.client.search,
+            self.collection_name,
+            data=[query],
+            anns_field="sparse_embedding",
+            filter=f'tenant_id == "{tenant_id}"',
+            limit=limit,
+            search_params={"metric_type": "BM25", "params": {}},
+            consistency_level=self.consistency_level,
+            output_fields=[
+                "chunk_id",
+                "document_id",
+                "filename",
+                "chunk_index",
+                "content",
+                "embedding_text",
+                "metadata_json",
+            ],
+        )
+        return [
+            VectorHit(_row_to_chunk(item["entity"]), float(item["distance"]))
+            for item in result[0]
         ]
 
     async def get_document_chunks(

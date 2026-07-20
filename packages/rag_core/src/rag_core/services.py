@@ -19,12 +19,20 @@ from rag_core.contracts import (
     ObjectStore,
     QueryRewriter,
     Reranker,
+    RetrievalRouter,
     TraceRepository,
     VectorStore,
 )
 from rag_core.generation import citations_from_answer, replace_asset_urls
 from rag_core.metrics import FEEDBACK_COUNT, INGESTED_DOCUMENTS, STAGE_LATENCY
-from rag_core.models import Citation, Feedback, GeneratedAnswer, IngestionResult, MessageTrace
+from rag_core.models import (
+    ChatSession,
+    Citation,
+    Feedback,
+    GeneratedAnswer,
+    IngestionResult,
+    MessageTrace,
+)
 from rag_core.retrieval import ParentDocumentRetriever
 from rag_core.utils import atomic_json_write, read_json, stable_id
 
@@ -159,7 +167,10 @@ class RagService:
         traces: TraceRepository,
         cache: Cache,
         session_store: Any,
+        retrieval_router: RetrievalRouter | None = None,
         vector_top_k: int = 20,
+        lexical_top_k: int = 20,
+        hybrid_search_enabled: bool = True,
         rerank_candidate_count: int = 20,
         final_top_k: int = 5,
         cache_ttl_seconds: int = 300,
@@ -167,14 +178,17 @@ class RagService:
         hyde_enabled: bool = True,
     ) -> None:
         self.rewriter = rewriter
+        self.retrieval_router = retrieval_router
         self.hyde_generator = hyde_generator
         self.retriever = ParentDocumentRetriever(
             embedder,
             vector_store,
             reranker,
-            vector_top_k,
-            rerank_candidate_count,
-            final_top_k,
+            vector_top_k=vector_top_k,
+            rerank_candidate_count=rerank_candidate_count,
+            final_top_k=final_top_k,
+            lexical_top_k=lexical_top_k,
+            hybrid_enabled=hybrid_search_enabled,
         )
         self.generator = generator
         self.traces = traces
@@ -198,11 +212,12 @@ class RagService:
         effective_history = history or stored_history
         timings: dict[str, float] = {}
 
-        use_retrieval = _should_use_retrieval(query)
+        use_retrieval = await self._route_retrieval(query, effective_history, timings)
         if use_retrieval and await self.retriever.vector_store.count(tenant_id) == 0:
             use_retrieval = False
         rewritten = query.strip()
         variants: list[str] = []
+        lexical_variants: list[str] = []
         if use_retrieval:
             started = time.perf_counter()
             try:
@@ -214,6 +229,7 @@ class RagService:
                 timings["rewrite"] = _elapsed(started)
                 if query.strip() != rewritten.strip():
                     variants.append(query)
+                    lexical_variants.append(query)
             if self.hyde_enabled and _should_run_hyde(rewritten):
                 started = time.perf_counter()
                 try:
@@ -229,7 +245,7 @@ class RagService:
             timings["direct_answer_route"] = 1.0
 
         route = "rag" if use_retrieval else "direct"
-        cache_key = f"rag:answer:{route}:{tenant_id}:{stable_id(rewritten, *variants)}"
+        cache_key = f"rag:answer:hybrid-v2:{route}:{tenant_id}:{stable_id(rewritten, *variants)}"
         cached = await self.cache.get_json(cache_key)
         contexts = []
         if isinstance(cached, dict):
@@ -243,13 +259,16 @@ class RagService:
             if use_retrieval:
                 started = time.perf_counter()
                 with STAGE_LATENCY.labels(stage="retrieval_rerank").time():
-                    contexts = await self.retriever.retrieve(rewritten, variants, tenant_id)
+                    contexts = await self.retriever.retrieve(
+                        rewritten,
+                        variants,
+                        tenant_id,
+                        lexical_variants=lexical_variants,
+                    )
                 timings["retrieval_rerank"] = _elapsed(started)
             started = time.perf_counter()
             with STAGE_LATENCY.labels(stage="generation").time():
-                generated = await self.generator.generate(
-                    rewritten, contexts, effective_history
-                )
+                generated = await self.generator.generate(rewritten, contexts, effective_history)
             timings["generation"] = _elapsed(started)
             await self.cache.set_json(
                 cache_key,
@@ -269,13 +288,12 @@ class RagService:
                     "document_id": item.document_id,
                     "filename": item.filename,
                     "score": item.score,
+                    "source_url": item.metadata.get("source_url"),
                     "matched_routes": item.metadata.get("matched_routes", []),
                     "rrf_score": item.metadata.get("rrf_score", 0.0),
                     "rerank_provider": item.metadata.get("rerank_provider", ""),
                     "rerank_model": item.metadata.get("rerank_model", ""),
-                    "rerank_fallback_reason": item.metadata.get(
-                        "rerank_fallback_reason", ""
-                    ),
+                    "rerank_fallback_reason": item.metadata.get("rerank_fallback_reason", ""),
                 }
                 for item in contexts
             ]
@@ -322,11 +340,12 @@ class RagService:
         effective_history = history or stored_history
         timings: dict[str, float] = {}
 
-        use_retrieval = _should_use_retrieval(query)
+        use_retrieval = await self._route_retrieval(query, effective_history, timings)
         if use_retrieval and await self.retriever.vector_store.count(tenant_id) == 0:
             use_retrieval = False
         rewritten = query.strip()
         variants: list[str] = []
+        lexical_variants: list[str] = []
         yield {
             "type": "start",
             "session_id": actual_session_id,
@@ -354,6 +373,7 @@ class RagService:
                 rewrite_stage = "rewrite"
                 if query.strip() != rewritten.strip():
                     variants.append(query)
+                    lexical_variants.append(query)
             timings[rewrite_stage] = _elapsed(started)
             yield {
                 "type": "timing",
@@ -388,7 +408,7 @@ class RagService:
             }
 
         route = "rag" if use_retrieval else "direct"
-        cache_key = f"rag:answer:{route}:{tenant_id}:{stable_id(rewritten, *variants)}"
+        cache_key = f"rag:answer:hybrid-v2:{route}:{tenant_id}:{stable_id(rewritten, *variants)}"
         cached = await self.cache.get_json(cache_key)
         contexts = []
 
@@ -407,7 +427,12 @@ class RagService:
             if use_retrieval:
                 started = time.perf_counter()
                 with STAGE_LATENCY.labels(stage="retrieval_rerank").time():
-                    contexts = await self.retriever.retrieve(rewritten, variants, tenant_id)
+                    contexts = await self.retriever.retrieve(
+                        rewritten,
+                        variants,
+                        tenant_id,
+                        lexical_variants=lexical_variants,
+                    )
                 timings["retrieval_rerank"] = _elapsed(started)
                 yield {
                     "type": "timing",
@@ -419,9 +444,7 @@ class RagService:
             first_token_recorded = False
             answer_parts: list[str] = []
             with STAGE_LATENCY.labels(stage="generation").time():
-                async for content in self.generator.stream(
-                    rewritten, contexts, effective_history
-                ):
+                async for content in self.generator.stream(rewritten, contexts, effective_history):
                     if not first_token_recorded:
                         timings["first_token"] = _elapsed(started)
                         first_token_recorded = True
@@ -464,13 +487,12 @@ class RagService:
                     "document_id": item.document_id,
                     "filename": item.filename,
                     "score": item.score,
+                    "source_url": item.metadata.get("source_url"),
                     "matched_routes": item.metadata.get("matched_routes", []),
                     "rrf_score": item.metadata.get("rrf_score", 0.0),
                     "rerank_provider": item.metadata.get("rerank_provider", ""),
                     "rerank_model": item.metadata.get("rerank_model", ""),
-                    "rerank_fallback_reason": item.metadata.get(
-                        "rerank_fallback_reason", ""
-                    ),
+                    "rerank_fallback_reason": item.metadata.get("rerank_fallback_reason", ""),
                 }
                 for item in contexts
             ]
@@ -504,17 +526,67 @@ class RagService:
             "citations": [asdict(item) for item in citations],
             "timings_ms": timings,
         }
+
+    async def _route_retrieval(
+        self,
+        query: str,
+        history: list[dict[str, str]],
+        timings: dict[str, float],
+    ) -> bool:
+        if self.retrieval_router is None:
+            return _should_use_retrieval(query)
+        started = time.perf_counter()
+        try:
+            with STAGE_LATENCY.labels(stage="retrieval_router").time():
+                decision = await self.retrieval_router.decide(query, history)
+        except Exception:
+            timings["retrieval_router_fallback"] = _elapsed(started)
+            return True
+        timings["retrieval_router"] = _elapsed(started)
+        return decision.needs_retrieval
+
+    async def list_sessions(
+        self, tenant_id: str = "default", user_id: str = "system", limit: int = 100
+    ) -> list[ChatSession]:
+        return await self.traces.list_sessions(tenant_id, user_id, limit)
+
+    async def get_session_messages(
+        self, session_id: str, tenant_id: str = "default", user_id: str = "system"
+    ) -> list[MessageTrace]:
+        return await self.traces.get_session_messages(session_id, tenant_id, user_id)
+
     async def get_session_history(
         self, session_id: str, tenant_id: str = "default", user_id: str = "system"
     ) -> list[dict[str, str]]:
+        messages = await self.get_session_messages(session_id, tenant_id, user_id)
+        if messages:
+            history: list[dict[str, str]] = []
+            for message in messages:
+                history.extend(
+                    [
+                        {"role": "user", "content": message.query},
+                        {"role": "assistant", "content": message.answer},
+                    ]
+                )
+            return history
         return await self.session_store.get_history(
             f"{tenant_id}:{user_id}:{session_id}", limit=100
         )
 
+    async def rename_session(
+        self,
+        session_id: str,
+        title: str,
+        tenant_id: str = "default",
+        user_id: str = "system",
+    ) -> ChatSession | None:
+        return await self.traces.rename_session(session_id, title, tenant_id, user_id)
+
     async def clear_session(
         self, session_id: str, tenant_id: str = "default", user_id: str = "system"
-    ) -> None:
+    ) -> bool:
         await self.session_store.clear(f"{tenant_id}:{user_id}:{session_id}")
+        return await self.traces.delete_session(session_id, tenant_id, user_id)
 
     async def feedback(
         self,
@@ -547,6 +619,7 @@ def _should_run_hyde(text: str) -> bool:
         return cjk_count >= 20
     word_count = len(normalized.split())
     return word_count >= 25
+
 
 def _should_use_retrieval(query: str) -> bool:
     normalized = "".join(query.strip().lower().split())

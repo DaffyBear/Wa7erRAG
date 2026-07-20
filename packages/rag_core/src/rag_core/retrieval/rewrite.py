@@ -17,9 +17,8 @@ class HeuristicQueryRewriter:
         )
         topic = previous_user.strip().rstrip("？?")
         return f"基于上一轮关于“{topic}”的讨论，{query.strip()}" if topic else query.strip()
-    async def stream(
-        self, query: str, history: Sequence[dict[str, str]]
-    ) -> AsyncIterator[str]:
+
+    async def stream(self, query: str, history: Sequence[dict[str, str]]) -> AsyncIterator[str]:
         yield await self.rewrite(query, history)
 
 
@@ -67,9 +66,7 @@ class OpenAICompatibleQueryRewriter:
             response.raise_for_status()
         return clean_rewrite_output(response.json()["choices"][0]["message"]["content"], query)
 
-    async def stream(
-        self, query: str, history: Sequence[dict[str, str]]
-    ) -> AsyncIterator[str]:
+    async def stream(self, query: str, history: Sequence[dict[str, str]]) -> AsyncIterator[str]:
         payload = self._request(query, history) | {"stream": True}
         parts: list[str] = []
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -100,6 +97,7 @@ class OpenAICompatibleQueryRewriter:
         cleaned = clean_rewrite_output("".join(parts), query)
         yield cleaned
 
+
 def clean_rewrite_output(raw: str, original_query: str) -> str:
     cleaned = raw.strip()
     if not cleaned:
@@ -110,10 +108,28 @@ def clean_rewrite_output(raw: str, original_query: str) -> str:
         cleaned = cleaned.strip("`").strip()
     for prefix in ("改写结果：", "改写后的问题：", "检索问题：", "Query:", "Rewritten query:"):
         if cleaned.lower().startswith(prefix.lower()):
-            cleaned = cleaned[len(prefix):].strip()
+            cleaned = cleaned[len(prefix) :].strip()
             break
     if "\n" in cleaned:
         cleaned = cleaned.splitlines()[0].strip()
     if len(cleaned) > max(300, len(original_query.strip()) * 8):
         return original_query.strip()
+    if _is_suspicious_rewrite(cleaned, original_query):
+        return original_query.strip()
     return cleaned or original_query.strip()
+
+
+def _is_suspicious_rewrite(cleaned: str, original_query: str) -> bool:
+    if "�" in cleaned:
+        return True
+    original_cjk_count = sum("\u4e00" <= character <= "\u9fff" for character in original_query)
+    if not original_cjk_count:
+        return False
+    cleaned_cjk_count = sum("\u4e00" <= character <= "\u9fff" for character in cleaned)
+    if cleaned_cjk_count == 0:
+        return True
+    minimum_retained_cjk = max(2, (original_cjk_count + 1) // 2)
+    if cleaned_cjk_count < minimum_retained_cjk:
+        return True
+    placeholder_count = cleaned.count("?") + cleaned.count("？")
+    return placeholder_count >= 3 and placeholder_count > cleaned_cjk_count

@@ -34,6 +34,8 @@ from rag_core.retrieval import (
     LexicalReranker,
     OpenAICompatibleHydeGenerator,
     OpenAICompatibleQueryRewriter,
+    OpenAICompatibleRetrievalRouter,
+    RuleBasedRetrievalRouter,
 )
 from rag_core.security import JwtCodec
 from rag_core.security_service import SecurityService
@@ -78,6 +80,9 @@ def get_container() -> Container:
     )
     object_store_provider = _provider(
         settings.rag_object_store_provider, settings.rag_use_mocks, "local", "minio"
+    )
+    router_provider = _provider(
+        settings.rag_router_provider, settings.rag_use_mocks, "rule", "openai"
     )
     rewrite_provider = _provider(
         settings.rag_rewrite_provider, settings.rag_use_mocks, "heuristic", "openai"
@@ -149,6 +154,18 @@ def get_container() -> Container:
             signing_secret=settings.security_asset_signing_secret,
         )
 
+    if not settings.rag_router_enabled:
+        retrieval_router = None
+    elif router_provider == "rule":
+        retrieval_router = RuleBasedRetrievalRouter()
+    else:
+        retrieval_router = OpenAICompatibleRetrievalRouter(
+            settings.model_gateway_base_url,
+            settings.model_gateway_api_key,
+            settings.rag_router_model,
+            settings.rag_router_timeout_seconds,
+        )
+
     if rewrite_provider == "heuristic":
         rewriter = HeuristicQueryRewriter()
     else:
@@ -184,11 +201,7 @@ def get_container() -> Container:
             circuit_failure_threshold=settings.rerank_circuit_failure_threshold,
             circuit_recovery_seconds=settings.rerank_circuit_recovery_seconds,
             max_document_chars=settings.rerank_max_document_chars,
-            fallback=(
-                lexical_reranker
-                if settings.rerank_fallback_provider == "lexical"
-                else None
-            ),
+            fallback=(lexical_reranker if settings.rerank_fallback_provider == "lexical" else None),
         )
 
     if generation_provider == "extractive":
@@ -258,7 +271,10 @@ def get_container() -> Container:
         traces,
         cache,
         sessions,
+        retrieval_router=retrieval_router,
         vector_top_k=settings.rag_vector_top_k,
+        lexical_top_k=settings.rag_lexical_top_k,
+        hybrid_search_enabled=settings.rag_hybrid_search_enabled,
         rerank_candidate_count=settings.rag_rerank_candidate_count,
         final_top_k=settings.rag_final_top_k,
         session_ttl_seconds=settings.rag_session_ttl_seconds,

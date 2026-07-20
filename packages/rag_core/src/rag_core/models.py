@@ -77,6 +77,12 @@ class Citation:
 
 
 @dataclass(slots=True)
+class RetrievalDecision:
+    needs_retrieval: bool
+    source: str
+
+
+@dataclass(slots=True)
 class GeneratedAnswer:
     answer: str
     rewritten_query: str
@@ -108,6 +114,17 @@ class MessageTrace:
     tenant_id: str = "default"
     user_id: str = "system"
     created_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(slots=True)
+class ChatSession:
+    session_id: str
+    title: str
+    message_count: int
+    tenant_id: str = "default"
+    user_id: str = "system"
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
 
 @dataclass(slots=True)

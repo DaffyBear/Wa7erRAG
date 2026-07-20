@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     rag_embedding_provider: Literal["auto", "deterministic", "openai"] = "auto"
     rag_vector_store_provider: Literal["auto", "memory", "milvus"] = "auto"
     rag_object_store_provider: Literal["auto", "local", "minio"] = "auto"
+    rag_router_provider: Literal["auto", "rule", "openai"] = "auto"
     rag_rewrite_provider: Literal["auto", "heuristic", "openai"] = "auto"
     rag_hyde_provider: Literal["auto", "heuristic", "openai"] = "auto"
     rag_rerank_provider: Literal["auto", "lexical", "http"] = "auto"
@@ -43,12 +44,17 @@ class Settings(BaseSettings):
     rag_embedding_model: str = "Qwen3-Embedding-8B"
     rag_embedding_dimension: int = 1024
     rag_generation_model: str = "Qwen2.5-72B"
+    rag_router_enabled: bool = True
+    rag_router_model: str = "deepseek-v4-flash"
+    rag_router_timeout_seconds: float = Field(default=5.0, gt=0)
     rag_rewrite_model: str = "Qwen2.5-7B-Instruct"
     rag_rerank_model: str = "bge-reranker-v2-m3"
     rag_short_document_limit: int = 6000
     rag_chunk_size: int = 6000
     rag_chunk_overlap: int = 500
     rag_vector_top_k: int = 20
+    rag_hybrid_search_enabled: bool = True
+    rag_lexical_top_k: int = 20
     rag_rerank_candidate_count: int = 20
     rag_final_top_k: int = 5
     rag_hyde_enabled: bool = True

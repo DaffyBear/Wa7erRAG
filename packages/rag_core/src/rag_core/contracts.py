@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Protocol
 
 from rag_core.models import (
+    ChatSession,
     Document,
     DocumentChunk,
     Feedback,
     GeneratedAnswer,
     MessageTrace,
+    RetrievalDecision,
     RetrievalResult,
     SemanticMetadata,
     VectorHit,
@@ -52,6 +54,9 @@ class VectorStore(Protocol):
     async def search(
         self, embedding: Sequence[float], limit: int, tenant_id: str = "default"
     ) -> list[VectorHit]: ...
+    async def lexical_search(
+        self, query: str, limit: int, tenant_id: str = "default"
+    ) -> list[VectorHit]: ...
     async def get_document_chunks(
         self, document_ids: Sequence[str], tenant_id: str = "default"
     ) -> list[DocumentChunk]: ...
@@ -62,6 +67,12 @@ class Reranker(Protocol):
     async def rerank(
         self, query: str, candidates: Sequence[RetrievalResult]
     ) -> list[RetrievalResult]: ...
+
+
+class RetrievalRouter(Protocol):
+    async def decide(
+        self, query: str, history: Sequence[dict[str, str]] = ()
+    ) -> RetrievalDecision: ...
 
 
 class QueryRewriter(Protocol):
@@ -118,3 +129,13 @@ class TraceRepository(Protocol):
     async def get_message(
         self, message_id: str, tenant_id: str = "default"
     ) -> MessageTrace | None: ...
+    async def list_sessions(
+        self, tenant_id: str, user_id: str, limit: int = 100
+    ) -> list[ChatSession]: ...
+    async def get_session_messages(
+        self, session_id: str, tenant_id: str, user_id: str
+    ) -> list[MessageTrace]: ...
+    async def rename_session(
+        self, session_id: str, title: str, tenant_id: str, user_id: str
+    ) -> ChatSession | None: ...
+    async def delete_session(self, session_id: str, tenant_id: str, user_id: str) -> bool: ...

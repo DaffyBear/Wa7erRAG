@@ -65,7 +65,7 @@ async def test_mock_ingestion_answer_and_distributed_session(tmp_path: Path) -> 
     assert "1883" in answer.answer
     assert answer.citations[0].filename == "mqtt.md"
     assert answer.citations[0].source_url == result.source_url
-    assert answer.timings_ms["hyde_generation"] >= 0
+    assert "hyde_generation" not in answer.timings_ms
     history = await rag.get_session_history(session_id)
     assert [item["role"] for item in history] == ["user", "assistant"]
     feedback = await rag.feedback(message_id, -1, "需要更简洁")

@@ -268,12 +268,20 @@ export default function HomePage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionActionId, setSessionActionId] = useState<string | null>(null);
+  const [renameSession, setRenameSession] = useState<ChatSession | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [feedbackMessageId, setFeedbackMessageId] = useState<string | null>(null);
+  const [feedbackReason, setFeedbackReason] = useState("");
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [deleteSession, setDeleteSession] = useState<ChatSession | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
   const programmaticScrollRef = useRef(false);
   const lastScrollYRef = useRef(0);
   const touchYRef = useRef<number | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const feedbackInputRef = useRef<HTMLTextAreaElement>(null);
   const authHeaders = useMemo(
     () => (token ? { Authorization: `Bearer ${token}` } : {}),
     [token],
@@ -606,41 +614,81 @@ export default function HomePage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function renameChatSession(item: ChatSession) {
-    const title = window.prompt("Rename conversation", item.title)?.trim();
-    if (!title || title === item.title) return;
-    const response = await authenticatedFetch(
-      `${apiBase}/chat/sessions/${item.session_id}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      },
-    );
-    if (!response.ok) return;
-    const renamed = (await response.json()) as ChatSession;
-    setChatSessions((current) =>
-      current.map((session) =>
-        session.session_id === renamed.session_id ? renamed : session,
-      ),
-    );
+  function openRenameDialog(item: ChatSession) {
+    setRenameSession(item);
+    setRenameTitle(item.title);
+    window.requestAnimationFrame(() => renameInputRef.current?.select());
   }
 
-  async function deleteChatSession(item: ChatSession) {
-    if (!window.confirm(`Delete "${item.title}"?`)) return;
-    const response = await authenticatedFetch(
-      `${apiBase}/chat/sessions/${item.session_id}`,
-      { method: "DELETE" },
-    );
-    if (!response.ok) return;
-    const remaining = chatSessions.filter(
-      (session) => session.session_id !== item.session_id,
-    );
-    setChatSessions(remaining);
-    if (sessionId !== item.session_id) return;
-    window.localStorage.removeItem(activeSessionStorageKey);
-    resetConversation();
-    if (remaining.length) await openSession(remaining[0].session_id);
+  function closeRenameDialog() {
+    if (renameSession && sessionActionId === renameSession.session_id) return;
+    setRenameSession(null);
+    setRenameTitle("");
+  }
+
+  async function renameChatSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!renameSession) return;
+    const title = renameTitle.trim();
+    if (!title || title === renameSession.title) {
+      closeRenameDialog();
+      return;
+    }
+
+    setSessionActionId(renameSession.session_id);
+    try {
+      const response = await authenticatedFetch(
+        `${apiBase}/chat/sessions/${renameSession.session_id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        },
+      );
+      if (!response.ok) return;
+      const renamed = (await response.json()) as ChatSession;
+      setChatSessions((current) =>
+        current.map((session) =>
+          session.session_id === renamed.session_id ? renamed : session,
+        ),
+      );
+      setRenameSession(null);
+      setRenameTitle("");
+    } finally {
+      setSessionActionId(null);
+    }
+  }
+  function openDeleteDialog(item: ChatSession) {
+    setDeleteSession(item);
+  }
+
+  function closeDeleteDialog() {
+    if (deleteSession && sessionActionId === deleteSession.session_id) return;
+    setDeleteSession(null);
+  }
+
+  async function deleteChatSession() {
+    if (!deleteSession) return;
+    const target = deleteSession;
+    setSessionActionId(target.session_id);
+    try {
+      const response = await authenticatedFetch(
+        `${apiBase}/chat/sessions/${target.session_id}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) return;
+      const remaining = chatSessions.filter(
+        (session) => session.session_id !== target.session_id,
+      );
+      setChatSessions(remaining);
+      setDeleteSession(null);
+      if (sessionId !== target.session_id) return;
+      window.localStorage.removeItem(activeSessionStorageKey);
+      resetConversation();
+      if (remaining.length) await openSession(remaining[0].session_id);
+    } finally {
+      setSessionActionId(null);
+    }
   }
   useEffect(() => {
     if (!token) return;
@@ -894,9 +942,19 @@ export default function HomePage() {
     }
   }
 
-  async function feedback(messageId: string, value: number) {
-    const reason =
-      value === -1 ? window.prompt("Please share your feedback") ?? "" : "";
+  function openFeedbackDialog(messageId: string) {
+    setFeedbackMessageId(messageId);
+    setFeedbackReason("");
+    window.requestAnimationFrame(() => feedbackInputRef.current?.focus());
+  }
+
+  function closeFeedbackDialog() {
+    if (feedbackBusy) return;
+    setFeedbackMessageId(null);
+    setFeedbackReason("");
+  }
+
+  async function sendFeedback(messageId: string, value: number, reason = "") {
     const response = await authenticatedFetch(
       `${apiBase}/messages/${messageId}/feedback`,
       {
@@ -906,7 +964,7 @@ export default function HomePage() {
       },
     );
 
-    if (!response.ok) return;
+    if (!response.ok) return false;
     setMessages((current) =>
       current.map((message) =>
         message.messageId === messageId
@@ -914,8 +972,27 @@ export default function HomePage() {
           : message,
       ),
     );
+    return true;
   }
 
+  async function submitFeedbackReason(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!feedbackMessageId) return;
+    setFeedbackBusy(true);
+    try {
+      const submitted = await sendFeedback(
+        feedbackMessageId,
+        -1,
+        feedbackReason.trim(),
+      );
+      if (submitted) {
+        setFeedbackMessageId(null);
+        setFeedbackReason("");
+      }
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
   if (!authReady) {
     return (
       <main className="auth-shell">
@@ -1082,7 +1159,7 @@ export default function HomePage() {
                   <div className="session-actions">
                     <button
                       type="button"
-                      onClick={() => void renameChatSession(item)}
+                      onClick={() => openRenameDialog(item)}
                       aria-label={`Rename ${item.title}`}
                       title="Rename"
                     >
@@ -1090,7 +1167,7 @@ export default function HomePage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => void deleteChatSession(item)}
+                      onClick={() => openDeleteDialog(item)}
                       aria-label={`Delete ${item.title}`}
                       title="Delete"
                     >
@@ -1192,10 +1269,10 @@ export default function HomePage() {
                         }`}
                       >
                         <span>Was this helpful ?</span>
-                        <button type="button" onClick={() => feedback(message.messageId!, 1)}>
+                        <button type="button" onClick={() => void sendFeedback(message.messageId!, 1)}>
                           Helpful
                         </button>
-                        <button type="button" onClick={() => feedback(message.messageId!, -1)}>
+                        <button type="button" onClick={() => openFeedbackDialog(message.messageId!)}>
                           Needs work
                         </button>
                       </div>
@@ -1243,6 +1320,156 @@ export default function HomePage() {
           </form>
         </div>
 
+        {renameSession && (
+          <div
+            className="rename-dialog-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeRenameDialog();
+            }}
+          >
+            <form
+              className="rename-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rename-dialog-title"
+              onSubmit={renameChatSession}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeRenameDialog();
+                }
+              }}
+            >
+              <div className="rename-dialog-heading">
+                <p className="eyebrow">Conversation</p>
+                <h2 id="rename-dialog-title">Rename</h2>
+              </div>
+              <input
+                ref={renameInputRef}
+                value={renameTitle}
+                onChange={(event) => setRenameTitle(event.target.value)}
+                maxLength={80}
+                autoFocus
+                aria-label="Conversation name"
+              />
+              <div className="rename-dialog-actions">
+                <button type="button" onClick={closeRenameDialog}>
+                  Cancel
+                </button>
+                <button
+                  className="rename-confirm"
+                  type="submit"
+                  disabled={
+                    !renameTitle.trim() ||
+                    sessionActionId === renameSession.session_id
+                  }
+                >
+                  {sessionActionId === renameSession.session_id
+                    ? "Saving..."
+                    : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        {feedbackMessageId && (
+          <div
+            className="rename-dialog-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeFeedbackDialog();
+            }}
+          >
+            <form
+              className="rename-dialog feedback-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="feedback-dialog-title"
+              onSubmit={submitFeedbackReason}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeFeedbackDialog();
+                }
+              }}
+            >
+              <div className="rename-dialog-heading">
+                <p className="eyebrow">Feedback</p>
+                <h2 id="feedback-dialog-title">What needs work?</h2>
+              </div>
+              <textarea
+                ref={feedbackInputRef}
+                value={feedbackReason}
+                onChange={(event) => setFeedbackReason(event.target.value)}
+                maxLength={500}
+                rows={4}
+                autoFocus
+                placeholder="Share your improvement suggestion..."
+                aria-label="Improvement suggestion"
+              />
+              <div className="rename-dialog-actions">
+                <button type="button" onClick={closeFeedbackDialog}>
+                  Cancel
+                </button>
+                <button
+                  className="rename-confirm"
+                  type="submit"
+                  disabled={feedbackBusy}
+                >
+                  {feedbackBusy ? "Sending..." : "Submit"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        {deleteSession && (
+          <div
+            className="rename-dialog-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeDeleteDialog();
+            }}
+          >
+            <div
+              className="rename-dialog delete-dialog"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-dialog-title"
+              aria-describedby="delete-dialog-description"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeDeleteDialog();
+                }
+              }}
+            >
+              <div className="rename-dialog-heading">
+                <p className="eyebrow">Conversation</p>
+                <h2 id="delete-dialog-title">Delete this conversation?</h2>
+              </div>
+              <p id="delete-dialog-description" className="delete-dialog-copy">
+                “{deleteSession.title}” will be permanently deleted. This action
+                cannot be undone.
+              </p>
+              <div className="rename-dialog-actions">
+                <button type="button" onClick={closeDeleteDialog} autoFocus>
+                  Cancel
+                </button>
+                <button
+                  className="delete-confirm"
+                  type="button"
+                  onClick={() => void deleteChatSession()}
+                  disabled={sessionActionId === deleteSession.session_id}
+                >
+                  {sessionActionId === deleteSession.session_id
+                    ? "Deleting..."
+                    : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="right-rail">
           <aside className="timing-panel" aria-live="polite">
             <div className="timing-panel-heading">

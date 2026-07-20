@@ -10,11 +10,11 @@
 
 ### Chat Workspace — Conversation
 
-![Chat workspace with RAG response](docs/images/chat-conversation-screen-v2.png)
+![Chat workspace with RAG response](docs/images/chat-conversation-screen-v3.png)
 
 ### Chat Workspace — Empty State
 
-![Chat workspace before conversation](docs/images/chat-empty-screen-v2.png)
+![Chat workspace before conversation](docs/images/chat-empty-screen-v3.png)
 
 
 面向企业内部技术文档的生产型 Retrieval-Augmented Generation（RAG）系统。项目覆盖文档治理、清洗、双格式导出、语义增强、向量入库、多路召回、父文档扩展、模型精排、答案生成、引用追踪、多租户安全、反馈闭环、离线评测和容器化部署。

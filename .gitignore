@@ -101,3 +101,6 @@ docker-compose.override.yml
 
 # Private local guidance
 科研指导skill.md
+
+# Private local design reference
+DESIGN.md

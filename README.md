@@ -1,8 +1,16 @@
 # WA7ER RAG
 
+**English** | [中文](README.zh-CN.md)
+
+A production-oriented Retrieval-Augmented Generation platform for enterprise technical documents. It covers document governance, cleaning, dual-format export, semantic enrichment, hybrid retrieval, parent-document expansion, reranking, streamed answer generation, traceable citations, multi-tenant security, persistent conversations, feedback loops, offline evaluation, observability, and containerized deployment.
+
+The core RAG pipeline is implemented without LangChain or LlamaIndex. Replaceable protocols and a lightweight service layer provide direct control over data processing, retrieval behavior, failure handling, and infrastructure integration.
+
+> This repository contains no real API keys, database passwords, private documents, user data, or local runtime artifacts. Sensitive configuration is loaded from an untracked `.env` file.
+
 ## Product Preview
 
-> 页面风格仅为作者个人喜好；历史会话栏中的内容仅用于作者试验，不包含其他特别暗示。
+> The visual style reflects the author's personal preferences. Conversation titles shown in the history panel are test data only and carry no additional implication.
 
 ### Login
 
@@ -16,289 +24,273 @@
 
 ![Chat workspace before conversation](docs/images/chat-empty-screen-v3.png)
 
+## Table of Contents
 
-面向企业内部技术文档的生产型 Retrieval-Augmented Generation（RAG）系统。项目覆盖文档治理、清洗、双格式导出、语义增强、向量入库、多路召回、父文档扩展、模型精排、答案生成、引用追踪、多租户安全、反馈闭环、离线评测和容器化部署。
+- [Highlights](#highlights)
+- [Architecture](#architecture)
+- [RAG Workflows](#rag-workflows)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Runtime Modes](#runtime-modes)
+- [Environment Variables](#environment-variables)
+- [Infrastructure](#infrastructure)
+- [Administrator Bootstrap](#administrator-bootstrap)
+- [Document Ingestion](#document-ingestion)
+- [Chat API](#chat-api)
+- [Main API Endpoints](#main-api-endpoints)
+- [Offline Evaluation](#offline-evaluation)
+- [Data Governance](#data-governance)
+- [Monitoring](#monitoring)
+- [Testing](#testing)
+- [Docker Deployment](#docker-deployment)
+- [Kubernetes Deployment](#kubernetes-deployment)
+- [Security](#security)
+- [Current Limitations](#current-limitations)
+- [Development Conventions](#development-conventions)
 
-本项目不依赖 LangChain 或 LlamaIndex 等通用 RAG 编排框架，核心链路使用可替换的接口和轻量服务层实现，便于控制每个数据处理阶段、定位检索问题并按实际业务需求调整策略。
+## Highlights
 
-> 本仓库不包含任何真实 API Key、数据库密码、用户数据或本地运行产物。所有敏感配置均通过项目根目录下未纳入 Git 的 `.env` 文件加载。
+### Document Processing
 
-## 目录
+- Supports PDF, DOCX, Markdown, HTML, and plain-text documents.
+- Extracts embedded DOCX images and PDF page images.
+- Cleans page metadata, forum markers, timestamps, numeric-only noise, compatibility messages, and other configurable patterns.
+- Produces two outputs for each document:
+  - Clean Markdown for indexing and machine processing.
+  - Clean DOCX for human-readable source review.
+- Records matched cleaning rules, text length, and processing status.
+- Uses checksums and checkpoints to skip unchanged documents while supporting forced reprocessing.
 
-- [核心能力](#核心能力)
-- [系统架构](#系统架构)
-- [RAG 处理流程](#rag-处理流程)
-- [技术栈](#技术栈)
-- [项目结构](#项目结构)
-- [快速开始](#快速开始)
-- [运行模式](#运行模式)
-- [环境变量](#环境变量)
-- [数据库与基础设施](#数据库与基础设施)
-- [初始化管理员](#初始化管理员)
-- [文档入库](#文档入库)
-- [问答接口](#问答接口)
-- [主要 API](#主要-api)
-- [离线评测](#离线评测)
-- [数据治理](#数据治理)
-- [监控](#监控)
-- [测试](#测试)
-- [Docker 部署](#docker-部署)
-- [Kubernetes 部署](#kubernetes-部署)
-- [安全说明](#安全说明)
-- [当前边界](#当前边界)
-- [开发约定](#开发约定)
+### Semantic Enrichment
 
-## 核心能力
+Each document can be enriched with:
 
-### 数据处理
+- A one-sentence summary.
+- Key technical terms.
+- Questions the document can answer.
 
-- 支持 PDF、DOCX、Markdown、HTML 和纯文本文件。
-- 提取 DOCX 内嵌图片及 PDF 页面图片资源。
-- 使用可扩展正则规则清理页面元信息、论坛结构标记、时间戳、纯数字噪音和兼容性提示。
-- 每份文档同时输出：
-  - 适合机器入库的干净 Markdown。
-  - 适合用户查看和引用的 Word 文档。
-- 记录清洗规则命中次数、文本长度和处理状态。
-- 使用校验和与检查点跳过未变化文档，支持强制重新处理。
+Enrichment can use either deterministic heuristics or an OpenAI-compatible model gateway. Question metadata improves alignment between natural user queries and document content.
 
-### 元数据增强
+### Chunking Strategy
 
-每份文档可生成以下语义元数据：
+- Documents below `RAG_SHORT_DOCUMENT_LIMIT` remain intact to preserve semantics.
+- Longer documents use recursive character splitting.
+- Default settings:
+  - Chunk size: `6000`
+  - Chunk overlap: `500`
+- Embedding text includes the title, summary, keywords, and answerable questions.
+- Original content is stored separately from enriched embedding text so citations remain clean.
 
-- 一句话摘要。
-- 关键技术术语。
-- 文档能够回答的问题列表。
+### Retrieval and Generation
 
-元数据可由启发式实现生成，也可以通过 OpenAI 兼容模型网关生成。问题型元数据可提升用户自然语言问题与文档内容之间的匹配能力。
+- Retrieval Router: rules handle obvious cases first; ambiguous queries are sent to a lightweight model that returns only a `needs_retrieval` JSON decision. Failures default to retrieval.
+- Query Rewrite: converts context-dependent follow-up questions into standalone queries only when retrieval is required.
+- HyDE: creates a hypothetical answer as an additional dense retrieval query.
+- Multi-route retrieval combines the original query, rewritten query, and HyDE query.
+- Milvus native BM25 lexical search is fused with dense retrieval at document level.
+- Reciprocal Rank Fusion merges multiple ranked result lists.
+- Parent-document expansion retrieves every chunk of a document when any child chunk matches, then restores chunk order.
+- Milvus HNSW indexing includes embedding-dimension and collection-schema validation.
+- Supports lexical reranking and external HTTP rerank services.
+- Default rerank candidate count is `20`; final context count is `5`.
+- General conversation can bypass the knowledge base and call the generation model directly.
+- Responses expose rewritten queries, citations, relevance scores, route decisions, and stage timings.
 
-### 分块策略
+### Application and Security
 
-- 不超过 `RAG_SHORT_DOCUMENT_LIMIT` 的短文档保持整篇入库，避免破坏完整语义。
-- 长文档使用递归字符切分。
-- 默认参数：
-  - Chunk Size：`6000`
-  - Chunk Overlap：`500`
-- 每个 Chunk 的 Embedding 文本附带标题、摘要、关键词和可回答问题。
-- 原始正文与 Embedding 文本分离，避免增强信息污染最终引用内容。
+- PostgreSQL persists sessions, messages, retrieval traces, feedback, users, tenants, API keys, and audit events.
+- Redis provides session state, answer caching, sliding-window rate limits, and distributed locks.
+- JWT and API-key authentication.
+- Tenant-level data isolation.
+- Role- and permission-based endpoint authorization.
+- Helpful / Needs Work feedback with optional reasons.
+- Request IDs, security auditing, and Prometheus metrics.
 
-### 检索与生成
+### Web Application
 
-- Retrieval Router：规则优先，模糊问题由轻量模型仅输出 `needs_retrieval` JSON，异常时默认检索。
-- Query Rewrite：仅在路由决定检索后，将多轮指代问题改写为自包含问题。
-- HyDE：生成假设答案作为额外检索查询。
-- 原问题、改写问题和 HyDE 查询多路向量召回。
-- Milvus 原生 BM25 词法召回，与 Dense 结果按文档级 RRF 融合。
-- 使用 Reciprocal Rank Fusion（RRF）融合多路检索结果。
-- 父文档扩展：任意 Chunk 命中后，拉取该文档全部 Chunk 并按 `chunk_index` 重组。
-- Milvus HNSW 向量索引与 Embedding 维度校验。
-- 支持词法 Rerank 和外部 HTTP Rerank 服务。
-- 默认粗排候选数 `20`，最终上下文数 `5`。
-- 普通闲聊可绕过知识库，直接调用生成模型。
-- 返回改写查询、引用文档、相关度分数和各阶段耗时。
+- Next.js single-page application.
+- Tenant, username, and password login.
+- Persistent conversation history with rename and delete operations.
+- Document upload and ingestion status.
+- Multi-turn streamed chat with reusable session IDs.
+- Query rewrite display and per-stage timing dashboard.
+- Markdown, code, links, images, and source citations.
+- Helpful / Needs Work feedback interactions.
+- Keyboard navigation across answers.
 
-### 业务与安全
-
-- PostgreSQL 持久化消息、检索轨迹、反馈、用户、租户、API Key 和审计事件。
-- Redis 存储多轮会话、答案缓存、滑动窗口限流和分布式锁。
-- JWT 登录和 API Key 鉴权。
-- 多租户数据隔离。
-- 基于角色和权限的接口控制。
-- 点赞、点踩及反馈理由记录。
-- 请求审计、Request ID 和 Prometheus 指标。
-
-### 前端
-
-- Next.js 单页应用。
-- 租户、用户名和密码登录。
-- 文档上传与入库状态展示。
-- 多轮问答和 Session ID 复用。
-- 改写查询展示。
-- Markdown 文本、代码、链接和图片渲染。
-- 引用文档跳转。
-- 点赞和点踩反馈。
-
-## 系统架构
+## Architecture
 
 ```mermaid
 flowchart LR
     U["Browser / API Client"] --> W["Next.js Web"]
-    W --> A["FastAPI"]
+    W --> A["FastAPI API"]
+    U --> A
 
-    A --> SEC["Security Service"]
-    SEC --> PG[(PostgreSQL)]
-    SEC --> RD[(Redis)]
+    A --> S["Security Service"]
+    A --> I["Ingestion Service"]
+    A --> R["RAG Service"]
+    A --> G["Governance Service"]
 
-    A --> ING["Ingestion Service"]
-    ING --> PARSE["Parser + Cleaner"]
-    PARSE --> META["Metadata Enrichment"]
-    META --> CHUNK["Chunking"]
-    CHUNK --> EMB["Embedding API"]
-    EMB --> MV[(Milvus)]
-    ING --> OBJ["Local / MinIO Object Store"]
-
-    A --> RAG["RAG Service"]
-    RAG --> RW["Query Rewrite"]
-    RAG --> HYDE["HyDE"]
-    RW --> MV
-    HYDE --> MV
-    MV --> PARENT["Parent Document Expansion"]
-    PARENT --> RR["Rerank Service"]
-    RR --> LLM["Generation Model"]
-    LLM --> A
-
-    RAG --> PG
-    RAG --> RD
-    A --> PROM["Prometheus Metrics"]
+    S --> PG["PostgreSQL"]
+    I --> OS["Local Store / MinIO"]
+    I --> M["Milvus"]
+    R --> M
+    R --> RD["Redis"]
+    R --> PG
+    R --> MG["Model Gateway"]
+    R --> RR["Rerank Service"]
+    G --> FS["Governance Reports"]
 ```
 
-## RAG 处理流程
+Core design principles:
 
-### 入库链路
+- Infrastructure is accessed through protocols and dependency injection.
+- Providers can be replaced independently.
+- Mock and production providers share the same application workflow.
+- Tenant identity is propagated through storage, retrieval, caching, and tracing.
+- Intermediate retrieval data is persisted for evaluation and debugging.
 
-```text
-原始文件
-  → 格式解析
-  → 噪音清洗
-  → 图片提取
-  → Markdown / Word 双版本导出
-  → 摘要、关键词、Questions 元数据增强
-  → 短文整篇或长文递归分块
-  → Embedding
-  → Milvus 向量与标量字段入库
-  → 保存检查点
+## RAG Workflows
+
+### Ingestion Workflow
+
+```mermaid
+flowchart LR
+    A["Source Document"] --> B["Parse text and assets"]
+    B --> C["Rule-based cleaning"]
+    C --> D["Markdown + DOCX export"]
+    C --> E["Semantic enrichment"]
+    E --> F["Short-document or recursive chunking"]
+    F --> G["Embedding generation"]
+    G --> H["Milvus dense + sparse indexing"]
+    D --> I["Local Store / MinIO"]
+    H --> J["Checkpoint update"]
 ```
 
-### 查询链路
+### Query Workflow
 
-```text
-用户问题 + 会话历史
-  → 判断是否需要知识库检索
-  → Query Rewrite
-  → HyDE 假设答案
-  → 多路向量召回
-  → RRF 融合
-  → 根据命中 Chunk 拉取完整父文档
-  → Top-20 Rerank
-  → Top-5 上下文
-  → LLM 生成答案和引用
-  → PostgreSQL 保存检索轨迹
-  → Redis 保存会话与缓存
+```mermaid
+flowchart LR
+    Q["User Query"] --> RT["Retrieval Router"]
+    RT -->|Direct| LLM["Generation Model"]
+    RT -->|Retrieve| RW["Query Rewrite"]
+    RW --> HY["Conditional HyDE"]
+    Q --> DR["Dense Retrieval"]
+    RW --> DR
+    HY --> DR
+    Q --> BM["BM25 Retrieval"]
+    RW --> BM
+    DR --> RF["Document-level RRF"]
+    BM --> RF
+    RF --> PE["Parent-document Expansion"]
+    PE --> RR["Rerank"]
+    RR --> CTX["Final Context"]
+    CTX --> LLM
+    LLM --> ANS["Streamed Answer + Citations"]
+    ANS --> TR["PostgreSQL Trace + Feedback"]
 ```
 
-### 普通对话路由
+HyDE is skipped when the rewritten query is shorter than the configured threshold. This avoids unnecessary latency for short or already explicit queries.
 
-问候、感谢和简单闲聊不会强制查询知识库。系统直接调用生成模型，避免在用户输入“你好”时返回“未找到相关信息”。专业问题或知识型问题进入完整 RAG 链路。
+### General Conversation Route
 
-## 技术栈
+Questions such as greetings, model identity, or general conversation can bypass retrieval. The router decides whether the knowledge base is needed, allowing RAG to enhance domain answers without forcing every message through document search.
 
-| 层级 | 技术 |
+## Technology Stack
+
+| Layer | Technologies |
 |---|---|
-| API | Python 3.11、FastAPI、Pydantic |
-| Web | Next.js、React、TypeScript |
-| 关系数据库 | PostgreSQL、SQLAlchemy Async、asyncpg |
-| 状态存储 | Redis |
-| 向量数据库 | Milvus |
-| 对象存储 | 本地签名文件服务或 MinIO |
-| 模型协议 | OpenAI Compatible API |
-| 精排 | 词法 Rerank 或 HTTP Rerank API |
-| 文档处理 | python-docx、pypdf、BeautifulSoup、markdownify |
-| 监控 | Prometheus、Grafana 配置示例 |
-| 部署 | Docker Compose、Kubernetes |
-| 测试 | pytest、pytest-asyncio、Ruff |
+| Web | Next.js 16, React 19, TypeScript |
+| API | FastAPI, Pydantic, Uvicorn |
+| RAG Core | Python 3.11+, protocol-based services |
+| Vector Database | Milvus, HNSW, native BM25 sparse vectors |
+| Relational Database | PostgreSQL, SQLAlchemy AsyncIO, asyncpg |
+| State and Cache | Redis |
+| Object Storage | Local signed storage or MinIO |
+| Model Integration | OpenAI-compatible HTTP APIs |
+| Reranking | External HTTP reranker with lexical fallback |
+| Observability | Prometheus, structured logs, request audit records |
+| Deployment | Docker Compose and Kubernetes examples |
+| Testing | pytest, Ruff, mypy, TypeScript compiler |
 
-## 项目结构
+## Project Structure
 
 ```text
-.
+RAG_v1/
 ├─ apps/
-│  ├─ api/                    # FastAPI 应用、路由、Schema、依赖注入
-│  └─ web/                    # Next.js 前端
-├─ packages/rag_core/src/
-│  └─ rag_core/
-│     ├─ cleaning/            # 解析、清洗、双格式导出
-│     ├─ enrichment/          # 摘要、关键词、Questions 增强
-│     ├─ generation/          # LLM 生成与图片 URL 替换
-│     ├─ governance/          # 数据盘点、抽样、审核、版本比较
-│     ├─ infrastructure/      # PostgreSQL、Redis、Milvus、MinIO、Rerank
-│     ├─ ingestion/           # 分块与 Embedding
-│     ├─ retrieval/           # Rewrite、HyDE、RRF、父文档召回、Rerank
-│     ├─ config.py            # 环境配置
-│     ├─ contracts.py         # 组件协议
-│     ├─ models.py            # 领域模型
-│     ├─ security_service.py  # 多租户安全服务
-│     └─ services.py          # 入库与 RAG 编排服务
-├─ configs/                   # 清洗与 RAG 配置示例
+│  ├─ api/                     # FastAPI application and HTTP routes
+│  └─ web/                     # Next.js frontend
+├─ packages/rag_core/          # Cleaning, ingestion, retrieval, generation and security
+├─ pipelines/                  # Ingestion, governance and migration commands
+├─ evaluation/                 # Offline evaluation datasets and runner
+├─ migrations/                 # PostgreSQL initialization SQL
+├─ configs/                    # Cleaning and RAG configuration
 ├─ deploy/
-│  ├─ docker/                 # Dockerfile 与 Compose
-│  ├─ kubernetes/             # K8s 工作负载示例
-│  └─ monitoring/             # Prometheus 配置
-├─ evaluation/                # Recall@K / MRR 评测
-├─ migrations/                # PostgreSQL 初始化 SQL
-├─ pipelines/                 # 离线入库与数据治理 CLI
-├─ scripts/                   # Windows 辅助脚本
-├─ tests/                     # 单元测试和集成测试
-├─ .env.example               # 无敏感信息的配置模板
-└─ pyproject.toml
+│  ├─ docker/                  # Dockerfiles and Compose manifests
+│  ├─ kubernetes/              # Kubernetes examples
+│  └─ monitoring/              # Prometheus configuration
+├─ docs/                       # Architecture, security and infrastructure guides
+├─ scripts/                    # Windows helper scripts
+├─ tests/                      # Unit and integration tests
+├─ data/                       # Local runtime data, ignored by Git
+├─ .env.example
+├─ README.md                   # English documentation
+└─ README.zh-CN.md             # Chinese documentation
 ```
 
-## 快速开始
+## Quick Start
 
-### 前置要求
+### Prerequisites
 
-- Python `3.11`
-- Node.js `20+`，推荐 `22`
+- Python `>=3.11,<3.13`
+- Node.js 22+
 - npm
-- 可选：Conda
-- 生产组件模式还需要：
-  - PostgreSQL
-  - Redis
-  - Milvus
-  - MinIO 或共享文件存储
-  - OpenAI 兼容模型 API
-  - 可选的 Rerank API
+- Docker Desktop for production infrastructure
+- Conda is recommended on Windows
 
-### 1. 克隆项目
+### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/DaffyBear/Wa7erRAG.git
+cd Wa7erRAG
 ```
 
-### 2. 创建 Python 环境
+### 2. Create the Python Environment
 
-使用 Conda：
+Using Conda:
 
 ```bash
-conda create -n RAG_E python=3.11 -y
+conda env create -f environment.yml
 conda activate RAG_E
 ```
 
-或使用 venv：
+Using `venv`:
 
 ```bash
 python -m venv .venv
 ```
 
-Windows：
+Windows:
 
 ```bat
 .venv\Scripts\activate
 ```
 
-Linux/macOS：
+Linux/macOS:
 
 ```bash
 source .venv/bin/activate
 ```
 
-### 3. 安装后端依赖
+### 3. Install Backend Dependencies
 
 ```bash
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-### 4. 安装前端依赖
+### 4. Install Frontend Dependencies
 
 ```bash
 cd apps/web
@@ -306,21 +298,21 @@ npm install
 cd ../..
 ```
 
-### 5. 创建本地配置
+### 5. Create Local Configuration
 
-Windows：
+Windows:
 
 ```bat
 copy .env.example .env
 ```
 
-Linux/macOS：
+Linux/macOS:
 
 ```bash
 cp .env.example .env
 ```
 
-不要把 `.env` 提交到 Git。请至少替换以下配置：
+Never commit `.env`. At minimum, replace these values:
 
 ```env
 SECURITY_JWT_SECRET=replace-with-a-long-random-secret
@@ -328,9 +320,9 @@ SECURITY_BOOTSTRAP_TOKEN=replace-with-a-one-time-bootstrap-token
 SECURITY_ASSET_SIGNING_SECRET=replace-with-another-random-secret
 ```
 
-### 6. Mock 模式启动
+### 6. Start in Mock Mode
 
-Mock 模式无需 PostgreSQL、Redis、Milvus、MinIO 或外部模型服务，适合快速体验和开发测试：
+Mock mode requires no PostgreSQL, Redis, Milvus, MinIO, or external model APIs:
 
 ```env
 RAG_USE_MOCKS=true
@@ -338,6 +330,7 @@ RAG_METADATA_PROVIDER=auto
 RAG_EMBEDDING_PROVIDER=auto
 RAG_VECTOR_STORE_PROVIDER=auto
 RAG_OBJECT_STORE_PROVIDER=auto
+RAG_ROUTER_PROVIDER=auto
 RAG_REWRITE_PROVIDER=auto
 RAG_HYDE_PROVIDER=auto
 RAG_RERANK_PROVIDER=auto
@@ -347,82 +340,63 @@ RAG_SECURITY_PROVIDER=auto
 RAG_STATE_PROVIDER=auto
 ```
 
-启动 API：
-
-```bash
-set PYTHONPATH=packages\rag_core\src;apps\api
-python -m uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port 8000 --reload
-```
-
-PowerShell：
+Start the API in PowerShell:
 
 ```powershell
 $env:PYTHONPATH="packages\rag_core\src;apps\api"
-python -m uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port 8000 --reload
+conda run -n RAG_E python -m uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port 8000 --reload
 ```
 
-Linux/macOS：
+Linux/macOS:
 
 ```bash
 PYTHONPATH=packages/rag_core/src:apps/api \
 python -m uvicorn app.main:app --app-dir apps/api --host 0.0.0.0 --port 8000 --reload
 ```
 
-启动 Web：
+Start the web application:
 
 ```bash
 cd apps/web
 npm run dev
 ```
 
-访问：
+Open:
 
-- Web：`http://localhost:3000`
-- API 文档：`http://localhost:8000/docs`
-- 健康检查：`http://localhost:8000/api/v1/health`
-- Prometheus 指标：`http://localhost:8000/api/v1/metrics`
+- Web: `http://localhost:3000`
+- API documentation: `http://localhost:8000/docs`
+- Health endpoint: `http://localhost:8000/api/v1/health`
+- Prometheus metrics: `http://localhost:8000/api/v1/metrics`
 
-Windows 用户也可以在激活 Python 环境后运行：
-
-```bat
-scripts\run_api.cmd
-scripts\run_web.cmd
-```
-
-### Windows 一键启停
-
-当前本地生产配置可以通过以下脚本统一管理 PostgreSQL 检查、Redis、Milvus、Attu、API 和 Web：
+### Windows Start and Stop Scripts
 
 ```bat
 scripts\start_all.cmd
 ```
 
-停止项目服务：
-
 ```bat
 scripts\stop_all.cmd
 ```
 
-启动脚本使用固定端口：Web `3000`、API `8000`、Attu `8001`、Milvus `19530`。日志写入 `tmp\runtime\logs`。停止脚本不会关闭 PostgreSQL，避免影响其他数据库。
+The scripts manage Redis, Milvus, Attu, API, and Web startup while checking PostgreSQL. Default ports are Web `3000`, API `8000`, Attu `8001`, and Milvus `19530`. Runtime logs are written to `tmp\runtime\logs`.
 
-## 运行模式
+## Runtime Modes
 
-项目支持两种配置方式。
-
-### 总体 Mock 开关
+### Global Mock Switch
 
 ```env
 RAG_USE_MOCKS=true
 ```
 
-当各组件 Provider 为 `auto` 时：
+When providers are set to `auto`:
 
-| 组件 | Mock 默认 | Production 默认 |
+| Component | Mock default | Production default |
 |---|---|---|
 | Metadata | heuristic | openai |
 | Embedding | deterministic | openai |
 | Vector Store | memory | milvus |
 | Object Store | local | minio |
+| Router | rule | openai |
 | Rewrite | heuristic | openai |
 | HyDE | heuristic | openai |
 | Rerank | lexical | http |
@@ -431,9 +405,9 @@ RAG_USE_MOCKS=true
 | Security | memory | postgres |
 | State | memory | redis |
 
-### 独立 Provider 覆盖
+### Per-provider Overrides
 
-即使 `RAG_USE_MOCKS=true`，也可以按组件逐步接入真实基础设施：
+Real infrastructure can be enabled incrementally even when `RAG_USE_MOCKS=true`:
 
 ```env
 RAG_USE_MOCKS=true
@@ -447,36 +421,35 @@ RAG_RERANK_PROVIDER=http
 RAG_OBJECT_STORE_PROVIDER=local
 ```
 
-这种模式适合开发环境逐项联调。
+## Environment Variables
 
-## 环境变量
+Copy `.env.example` and use it as the authoritative list.
 
-完整模板见 `.env.example`。
+### Application and Security
 
-### 应用与安全
-
-| 变量 | 说明 |
+| Variable | Purpose |
 |---|---|
-| `APP_NAME` | 应用名称 |
-| `APP_ENV` | 环境名称 |
-| `APP_DEBUG` | 调试开关 |
-| `LOG_LEVEL` | 日志等级 |
-| `SECURITY_ENABLED` | 是否启用安全模块 |
-| `SECURITY_JWT_SECRET` | JWT 签名密钥，生产必须更换 |
-| `SECURITY_JWT_ISSUER` | JWT Issuer |
-| `SECURITY_JWT_AUDIENCE` | JWT Audience |
-| `SECURITY_ACCESS_TOKEN_TTL_SECONDS` | Access Token 有效期 |
-| `SECURITY_BOOTSTRAP_TOKEN` | 首次管理员初始化令牌 |
-| `SECURITY_ASSET_SIGNING_SECRET` | 本地文件 URL 签名密钥 |
+| `APP_NAME` | Application name |
+| `APP_ENV` | Runtime environment |
+| `APP_DEBUG` | Debug mode |
+| `LOG_LEVEL` | Logging level |
+| `SECURITY_ENABLED` | Enables authentication and authorization |
+| `SECURITY_JWT_SECRET` | JWT signing secret; must be replaced in production |
+| `SECURITY_JWT_ISSUER` | JWT issuer |
+| `SECURITY_JWT_AUDIENCE` | JWT audience |
+| `SECURITY_ACCESS_TOKEN_TTL_SECONDS` | Access-token lifetime |
+| `SECURITY_BOOTSTRAP_TOKEN` | One-time administrator bootstrap token |
+| `SECURITY_ASSET_SIGNING_SECRET` | Local asset URL signing secret |
 
-### Provider
+### Providers
 
-| 变量 | 可选值 |
+| Variable | Supported values |
 |---|---|
 | `RAG_METADATA_PROVIDER` | `auto` / `heuristic` / `openai` |
 | `RAG_EMBEDDING_PROVIDER` | `auto` / `deterministic` / `openai` |
 | `RAG_VECTOR_STORE_PROVIDER` | `auto` / `memory` / `milvus` |
 | `RAG_OBJECT_STORE_PROVIDER` | `auto` / `local` / `minio` |
+| `RAG_ROUTER_PROVIDER` | `auto` / `rule` / `openai` |
 | `RAG_REWRITE_PROVIDER` | `auto` / `heuristic` / `openai` |
 | `RAG_HYDE_PROVIDER` | `auto` / `heuristic` / `openai` |
 | `RAG_RERANK_PROVIDER` | `auto` / `lexical` / `http` |
@@ -485,7 +458,7 @@ RAG_OBJECT_STORE_PROVIDER=local
 | `RAG_SECURITY_PROVIDER` | `auto` / `memory` / `postgres` |
 | `RAG_STATE_PROVIDER` | `auto` / `memory` / `redis` |
 
-### 模型配置
+### Model Configuration
 
 ```env
 MODEL_GATEWAY_BASE_URL=https://model-gateway.example.com/v1
@@ -494,13 +467,14 @@ MODEL_GATEWAY_API_KEY=replace-with-model-api-key
 RAG_EMBEDDING_MODEL=your-embedding-model
 RAG_EMBEDDING_DIMENSION=1024
 RAG_GENERATION_MODEL=your-chat-model
+RAG_ROUTER_MODEL=your-lightweight-chat-model
 RAG_REWRITE_MODEL=your-lightweight-chat-model
 RAG_HYDE_MODEL=your-lightweight-chat-model
 ```
 
-模型网关需要兼容 OpenAI 风格接口。Embedding 维度一旦用于创建 Milvus Collection，不应直接修改；更换维度时应创建新 Collection 并重新入库。
+The model gateway must expose OpenAI-compatible endpoints. Once an embedding dimension is used to create a Milvus collection, changing it requires a new collection and re-ingestion.
 
-### Rerank 配置
+### Rerank Configuration
 
 ```env
 RAG_RERANK_PROVIDER=http
@@ -519,66 +493,41 @@ RERANK_MAX_DOCUMENT_CHARS=12000
 RERANK_FALLBACK_PROVIDER=lexical
 ```
 
-HTTP Rerank 服务需要接受：
+The HTTP reranker client provides:
 
-```json
-{
-  "model": "your-rerank-model",
-  "query": "用户问题",
-  "documents": ["候选文档一", "候选文档二"],
-  "top_n": 2,
-  "return_documents": false
-}
-```
+- Shared HTTP connection pooling.
+- Semaphore-based concurrency limits.
+- Queue timeouts.
+- Exponential-backoff retries for network errors, timeouts, `408`, `425`, `429`, and `5xx` responses.
+- `Retry-After` support.
+- Closed, Open, and Half-Open circuit-breaker states.
+- Lexical fallback for remote failures or malformed responses.
+- Candidate truncation to control request size and inference cost.
+- Provider, model, fallback reason, retry, latency, and circuit-state metrics.
 
-工程化客户端具备以下保护：
+Set `RERANK_FALLBACK_PROVIDER=none` to disable fallback and propagate remote rerank failures.
 
-- 复用 HTTP 连接池，避免每次请求重新建立连接。
-- 使用信号量限制并发请求数。
-- 排队超过 `RERANK_QUEUE_TIMEOUT_SECONDS` 时直接降级。
-- 对网络异常、超时、`408/425/429/5xx` 执行指数退避重试。
-- 优先遵循服务端 `Retry-After`。
-- 连续失败达到阈值后开启熔断器。
-- 熔断恢复窗口结束后只允许单个 Half-Open 探测请求。
-- 服务不可用、响应格式错误或熔断开启时降级到词法精排。
-- 截断过长候选文档，控制请求大小和远端推理成本。
-- 将远端或降级来源、模型名称和降级原因写入检索轨迹。
-- 暴露调用结果、重试、降级、熔断状态、延迟和候选数量指标。
+### Retrieval Configuration
 
-将 `RERANK_FALLBACK_PROVIDER` 设置为 `none` 可以关闭降级，此时远端精排失败会向上抛出错误。生产环境推荐保持 `lexical`。
-
-并返回类似：
-
-```json
-{
-  "results": [
-    {"index": 1, "relevance_score": 0.95},
-    {"index": 0, "relevance_score": 0.12}
-  ]
-}
-```
-
-### 检索参数
-
-| 变量 | 默认值 | 说明 |
+| Variable | Default | Purpose |
 |---|---:|---|
-| `RAG_SHORT_DOCUMENT_LIMIT` | `6000` | 短文档整篇入库阈值 |
-| `RAG_CHUNK_SIZE` | `6000` | 长文档 Chunk 大小 |
-| `RAG_CHUNK_OVERLAP` | `500` | Chunk 重叠长度 |
-| `RAG_VECTOR_TOP_K` | `20` | 每路向量召回数量 |
-| `RAG_ROUTER_ENABLED` | `true` | 是否启用检索路由 |
-| `RAG_ROUTER_MODEL` | `deepseek-v4-flash` | 检索路由模型，仅输出布尔 JSON |
-| `RAG_ROUTER_TIMEOUT_SECONDS` | `5` | 路由请求超时，失败时默认检索 |
-| `RAG_HYBRID_SEARCH_ENABLED` | `true` | 是否启用 Dense + BM25 混合检索 |
-| `RAG_LEXICAL_TOP_K` | `20` | 每路 BM25 召回数量 |
-| `RAG_RERANK_CANDIDATE_COUNT` | `20` | Rerank 候选数量 |
-| `RAG_FINAL_TOP_K` | `5` | 最终生成上下文数量 |
-| `RAG_HYDE_ENABLED` | `true` | 是否启用 HyDE |
+| `RAG_SHORT_DOCUMENT_LIMIT` | `6000` | Whole-document threshold |
+| `RAG_CHUNK_SIZE` | `6000` | Long-document chunk size |
+| `RAG_CHUNK_OVERLAP` | `500` | Chunk overlap |
+| `RAG_VECTOR_TOP_K` | `20` | Dense candidates per query route |
+| `RAG_ROUTER_ENABLED` | `true` | Enables retrieval routing |
+| `RAG_ROUTER_MODEL` | `deepseek-v4-flash` | Model returning retrieval decision JSON |
+| `RAG_ROUTER_TIMEOUT_SECONDS` | `5` | Router timeout; failures default to retrieval |
+| `RAG_HYBRID_SEARCH_ENABLED` | `true` | Enables Dense + BM25 retrieval |
+| `RAG_LEXICAL_TOP_K` | `20` | BM25 candidates per lexical route |
+| `RAG_RERANK_CANDIDATE_COUNT` | `20` | Rerank candidate count |
+| `RAG_FINAL_TOP_K` | `5` | Final context count |
+| `RAG_HYDE_ENABLED` | `true` | Enables conditional HyDE |
 | `RAG_HNSW_M` | `16` | HNSW M |
-| `RAG_HNSW_EF_CONSTRUCTION` | `256` | HNSW 构建参数 |
-| `RAG_HNSW_EF_SEARCH` | `64` | HNSW 查询参数 |
+| `RAG_HNSW_EF_CONSTRUCTION` | `256` | HNSW construction parameter |
+| `RAG_HNSW_EF_SEARCH` | `64` | HNSW query parameter |
 
-## 数据库与基础设施
+## Infrastructure
 
 ### PostgreSQL
 
@@ -586,19 +535,9 @@ HTTP Rerank 服务需要接受：
 POSTGRES_DSN=postgresql+asyncpg://rag_user:strong-password@localhost:5432/enterprise_rag
 ```
 
-应用启动时会调用 Repository 的 Schema 初始化逻辑。生产环境建议使用 `migrations/` 下的 SQL，通过正式迁移流程执行。
+PostgreSQL stores tenants, users, memberships, API keys, audit events, sessions, messages, retrieval traces, and feedback. Use a dedicated least-privilege database owner rather than a PostgreSQL superuser.
 
-主要表：
-
-- `tenants`
-- `users`
-- `tenant_memberships`
-- `api_keys`
-- `audit_events`
-- `messages`
-- `feedback`
-
-不要使用 PostgreSQL 超级用户作为应用账号。建议为项目创建独立数据库和最小权限 Owner。
+The application can initialize repository schemas for development. Production deployments should apply versioned SQL from `migrations/` through a controlled migration process.
 
 ### Redis
 
@@ -607,31 +546,31 @@ RAG_STATE_PROVIDER=redis
 REDIS_URL=redis://localhost:6379/0
 ```
 
-Redis 用于：
+Redis is used for:
 
-- 会话历史及 TTL。
-- 查询答案缓存。
-- 登录、聊天和上传接口限流。
-- 文档入库分布式锁。
+- Conversation state and TTL.
+- Answer caching.
+- Login, chat, and upload rate limiting.
+- Distributed ingestion locks.
 
-应用启动时会执行 Redis Ping，连接失败会阻止 API 启动。
+The API pings Redis during startup and refuses to start when the configured backend is unavailable.
 
 ### Milvus
 
-启动本项目提供的 Milvus Standalone：
+Start Milvus Standalone:
 
 ```bash
 docker compose -p enterprise-rag-milvus \
   -f deploy/docker/docker-compose.milvus.yml up -d
 ```
 
-Windows：
+Windows:
 
 ```bat
 scripts\start_milvus.cmd
 ```
 
-配置：
+Configuration:
 
 ```env
 RAG_VECTOR_STORE_PROVIDER=milvus
@@ -642,15 +581,15 @@ RAG_LEXICAL_TOP_K=20
 RAG_EMBEDDING_DIMENSION=1024
 ```
 
-Collection 同时包含 Dense 向量字段、由 Milvus BM25 Function 自动生成的 Sparse 向量字段，以及父文档召回所需的标量字段。系统会校验 Dense 维度及 BM25 Schema，旧 Collection 不兼容时会明确要求迁移，不会静默降级为纯向量检索。
+The collection contains dense vectors, sparse vectors generated by a Milvus BM25 Function, original text, enriched embedding text, tenant fields, filenames, document IDs, and chunk indexes. The application validates dense dimensions and BM25 schema compatibility instead of silently degrading to dense-only retrieval.
 
-旧 Collection 可直接复制已有 Dense 向量，无需重新调用 Embedding API：
+Migrate an older dense collection without calling the embedding API again:
 
 ```powershell
 scripts\migrate_milvus_hybrid.cmd --source enterprise_knowledge_tenant_v1 --target enterprise_knowledge_hybrid_v2
 ```
 
-迁移完成并验证后，将本地 `.env` 的 `MILVUS_COLLECTION` 切换为新 Collection。BM25 仅使用原问题与 Rewrite 查询，HyDE 仅参与 Dense 检索，避免假设答案稀释精确词匹配。
+After verification, update `MILVUS_COLLECTION` in `.env`. BM25 uses the original and rewritten queries; HyDE participates only in dense retrieval to avoid weakening exact lexical matches.
 
 ### MinIO
 
@@ -663,17 +602,17 @@ MINIO_BUCKET=rag-assets
 MINIO_SECURE=false
 ```
 
-如暂未部署 MinIO，可使用：
+Use local signed storage when MinIO is unavailable:
 
 ```env
 RAG_OBJECT_STORE_PROVIDER=local
 ```
 
-本地对象存储会生成带 HMAC 签名的文件访问地址。多副本生产部署应使用 MinIO 或共享持久卷，不应依赖每个容器的独立本地磁盘。
+Local object storage generates HMAC-signed asset URLs. Multi-replica production deployments should use MinIO or a shared persistent volume rather than container-local disks.
 
-## 初始化管理员
+## Administrator Bootstrap
 
-系统只允许执行一次 Bootstrap。请求头中的 Token 必须与 `.env` 中的 `SECURITY_BOOTSTRAP_TOKEN` 一致。
+Bootstrap is allowed only once. The request token must match `SECURITY_BOOTSTRAP_TOKEN`.
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/security/bootstrap \
@@ -687,9 +626,9 @@ curl -X POST http://localhost:8000/api/v1/security/bootstrap \
   }'
 ```
 
-密码至少 12 个字符。Bootstrap 成功后应轮换或停用 Bootstrap Token。
+Passwords must contain at least 12 characters. Rotate or disable the bootstrap token after initialization.
 
-登录：
+Login:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/security/token \
@@ -701,15 +640,15 @@ curl -X POST http://localhost:8000/api/v1/security/token \
   }'
 ```
 
-响应中的 `access_token` 用于后续请求：
+Use the returned token in subsequent requests:
 
 ```text
 Authorization: Bearer <access_token>
 ```
 
-## 文档入库
+## Document Ingestion
 
-### 支持格式
+### Supported Formats
 
 - `.pdf`
 - `.docx`
@@ -719,7 +658,7 @@ Authorization: Bearer <access_token>
 - `.htm`
 - `.txt`
 
-### API 上传
+### Upload API
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/documents/upload?force=false" \
@@ -727,7 +666,7 @@ curl -X POST "http://localhost:8000/api/v1/documents/upload?force=false" \
   -F "file=@./example.pdf"
 ```
 
-返回示例：
+Example response:
 
 ```json
 {
@@ -742,246 +681,161 @@ curl -X POST "http://localhost:8000/api/v1/documents/upload?force=false" \
 }
 ```
 
-### CLI 入库
+### CLI Ingestion
 
-```bash
-set PYTHONPATH=packages\rag_core\src;apps\api
-python pipelines/ingest.py data/raw
+PowerShell with the project Conda environment:
+
+```powershell
+$env:PYTHONPATH="packages\rag_core\src;apps\api"
+conda run -n RAG_E python pipelines/ingest.py data/raw
 ```
 
-强制重新处理：
+Force reprocessing:
 
-```bash
-python pipelines/ingest.py data/raw --force
+```powershell
+conda run -n RAG_E python pipelines/ingest.py data/raw --force
 ```
 
-Windows 辅助脚本：
+Windows helper:
 
 ```bat
 scripts\ingest.cmd data\raw
 ```
 
-## 问答接口
+## Chat API
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/chat \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "如何配置 MQTT？",
+    "query": "How should MQTT be configured?",
     "session_id": null,
     "history": []
   }'
 ```
 
-响应示例：
+The streaming endpoint returns newline-delimited JSON events for route decisions, rewrite output, timings, answer tokens, citations, completion, and errors. Reuse the returned `session_id` for subsequent turns. When explicit history is omitted, the service loads session history from Redis or the in-memory state provider.
 
-```json
-{
-  "message_id": "message-id",
-  "session_id": "session-id",
-  "answer": "回答内容",
-  "rewritten_query": "MQTT 如何配置？",
-  "citations": [
-    {
-      "document_id": "document-id",
-      "filename": "MQTT配置说明.docx",
-      "score": 0.93,
-      "source_url": "http://localhost:8000/api/v1/assets/..."
-    }
-  ],
-  "timings_ms": {
-    "rewrite": 100.0,
-    "hyde_generation": 200.0,
-    "retrieval_rerank": 300.0,
-    "generation": 500.0,
-    "total": 1100.0
-  }
-}
-```
+A persisted message trace contains:
 
-继续多轮对话时传回相同的 `session_id`。如果未显式提供 `history`，系统会从 Redis 或内存 Session Store 读取历史消息。
+- Original and rewritten query.
+- Retrieved document IDs and relevance scores.
+- Route, cache, HyDE, rerank, and fallback metadata.
+- Per-stage latency.
+- Final answer and citations.
+- Tenant and user identity.
 
-## 主要 API
+## Main API Endpoints
 
-所有业务接口前缀为 `/api/v1`。
-
-| 方法 | 路径 | 用途 |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | 应用健康检查 |
-| `GET` | `/metrics` | Prometheus 指标 |
-| `POST` | `/security/bootstrap` | 初始化首个管理员和租户 |
-| `POST` | `/security/token` | 用户名密码登录 |
-| `GET` | `/security/me` | 当前身份与权限 |
-| `POST` | `/security/users` | 创建租户用户 |
-| `POST` | `/security/api-keys` | 创建 API Key |
-| `DELETE` | `/security/api-keys/{key_id}` | 吊销 API Key |
-| `GET` | `/security/audit-events` | 查询安全审计事件 |
-| `POST` | `/documents/upload` | 上传并入库单个文档 |
-| `POST` | `/documents/ingest-directory` | 入库租户原始目录 |
-| `GET` | `/documents/stats` | 查询租户向量数量 |
-| `POST` | `/chat` | 执行对话或 RAG 问答 |
-| `GET` | `/chat/sessions/{session_id}` | 查询会话历史 |
-| `DELETE` | `/chat/sessions/{session_id}` | 清除会话历史 |
-| `POST` | `/messages/{message_id}/feedback` | 提交点赞、点踩和理由 |
-| `POST` | `/governance/audits` | 执行数据质量审计 |
-| `GET` | `/governance/audits` | 查询审计任务 |
-| `GET` | `/governance/audits/{run_id}` | 查询审计详情 |
-| `POST` | `/governance/audits/{run_id}/reviews` | 导入人工审核结果 |
-| `POST` | `/governance/comparisons` | 比较两次治理结果 |
+| `GET` | `/api/v1/health` | Health status |
+| `GET` | `/api/v1/metrics` | Prometheus metrics |
+| `POST` | `/api/v1/security/bootstrap` | One-time administrator bootstrap |
+| `POST` | `/api/v1/security/token` | Login and issue JWT |
+| `POST` | `/api/v1/documents/upload` | Upload and ingest a document |
+| `POST` | `/api/v1/chat` | Execute the streamed RAG workflow |
+| `GET` | `/api/v1/chat/sessions` | List persisted conversations |
+| `GET` | `/api/v1/chat/sessions/{session_id}` | Load a conversation |
+| `PATCH` | `/api/v1/chat/sessions/{session_id}` | Rename a conversation |
+| `DELETE` | `/api/v1/chat/sessions/{session_id}` | Delete a conversation and its feedback |
+| `POST` | `/api/v1/messages/{message_id}/feedback` | Store user feedback |
+| `GET` | `/api/v1/assets/{path}` | Access a signed local asset |
+| `POST` | `/api/v1/governance/runs` | Start a governance run |
 
-完整请求和响应 Schema 请以运行时 Swagger 文档为准：`http://localhost:8000/docs`。
+## Offline Evaluation
 
-## 离线评测
-
-评测数据格式：
-
-```json
-[
-  {
-    "question": "MQTT 默认端口是多少？",
-    "expected_document": "MQTT配置说明.docx"
-  }
-]
-```
-
-运行：
+Evaluation datasets are stored under `evaluation/`.
 
 ```bash
-set PYTHONPATH=packages\rag_core\src;apps\api
-python evaluation/evaluate.py evaluation/dataset.example.json
+conda run -n RAG_E python evaluation/evaluate.py \
+  --dataset evaluation/dataset.json \
+  --output data/reports/evaluation.json
 ```
 
-Windows：
+The evaluation workflow can measure:
 
-```bat
-scripts\evaluate.cmd evaluation\dataset.example.json
-```
+- Recall@K.
+- Mean Reciprocal Rank.
+- Retrieval latency.
+- Rerank latency and fallback rate.
+- Answer source coverage.
+- Routing and HyDE decisions.
 
-输出指标：
+Build evaluation cases from real, anonymized questions and label the correct source documents. Retrieval configuration should be changed based on measured results rather than intuition alone.
 
-- Recall@1
-- Recall@5
-- Recall@10
-- Recall@20
-- MRR
+## Data Governance
 
-生产评测集应来自真实业务问题，并由人工标注正确来源文档。建议分别评估 Rewrite、HyDE、父文档扩展和 Rerank 的增益。
-
-## 数据治理
-
-执行目录盘点、抽样和清洗审计：
+The governance pipeline inventories files, samples documents, records parse and cleaning results, and compares runs.
 
 ```bash
-set PYTHONPATH=packages\rag_core\src;apps\api
-python pipelines/governance.py audit ./data/raw --sample-size 50 --seed 2026
+conda run -n RAG_E python pipelines/governance.py data/raw
 ```
 
-导入人工审核结果：
+Generated reports are stored under `data/reports/`, which is excluded from Git.
+
+## Monitoring
+
+Prometheus configuration is available in `deploy/monitoring/`.
+
+Important metrics include:
+
+- API request rate, errors, and P99 latency.
+- Retrieval, rerank, first-token, and generation latency.
+- Rerank retries, fallback rate, circuit state, and candidate count.
+- Milvus query latency and memory usage.
+- Redis and PostgreSQL availability.
+- Model token usage.
+- Empty retrieval rate, negative-feedback rate, and bad-case count.
+
+## Testing
+
+Always run Python commands in the `RAG_E` Conda environment:
 
 ```bash
-python pipelines/governance.py import-review <run-id> ./review.csv
+conda run -n RAG_E python -m ruff check packages apps tests
+conda run -n RAG_E python -m pytest -q
 ```
 
-比较两次治理结果：
-
-```bash
-python pipelines/governance.py compare <baseline-run-id> <current-run-id>
-```
-
-治理产物默认写入 `data/reports/`，该目录中的运行结果不会提交到 Git。
-
-## 监控
-
-Prometheus 指标接口：
-
-```text
-GET /api/v1/metrics
-```
-
-项目已记录或预留以下指标：
-
-- 文档入库成功、失败和跳过数量。
-- 清洗、增强、Embedding、检索、Rerank 和生成阶段耗时。
-- 用户反馈数量。
-- API 请求耗时和状态。
-
-Prometheus 配置示例位于：
-
-```text
-deploy/monitoring/prometheus.yml
-```
-
-生产环境建议补充：
-
-- API P95 / P99 延迟。
-- Milvus 查询耗时与内存使用。
-- Redis 命中率和连接状态。
-- PostgreSQL 连接池状态。
-- Rerank 远端成功、失败、重试、降级、排队超时和熔断状态。
-- Rerank 远端与降级延迟以及候选数量分布。
-- 模型 Token 消耗。
-- 无召回率、点踩率和 Bad Case 数量。
-
-## 测试
-
-运行全部后端检查：
-
-```bash
-python -m ruff check packages apps tests
-python -m pytest -q
-```
-
-Windows：
-
-```bat
-scripts\test.cmd
-```
-
-前端生产构建：
+Frontend type check and production build:
 
 ```bash
 cd apps/web
+npx tsc --noEmit --incremental false
 npm run build
 ```
 
-测试覆盖：
+Coverage includes:
 
-- 清洗规则和双格式处理。
-- PDF 解析。
-- 短文与长文分块。
-- 父文档扩展召回。
-- Rerank 候选数量和 HTTP 响应映射。
-- HyDE。
-- Redis 风格会话、限流和分布式锁逻辑。
-- 多租户隔离。
-- 用户、角色、JWT、API Key 和审计。
-- FastAPI 会话、限流、治理与完整 RAG 流程。
+- Cleaning rules and dual-format exports.
+- PDF parsing and asset extraction.
+- Short- and long-document chunking.
+- Dense, BM25, RRF, and parent-document retrieval.
+- HTTP reranking, retries, circuit breaking, and fallback.
+- Query rewrite, routing, and HyDE.
+- Redis-like sessions, caching, rate limits, and distributed locks.
+- Multi-tenant isolation.
+- Users, roles, JWT, API keys, and auditing.
+- Persistent conversation management.
+- FastAPI integration and end-to-end RAG flow.
 
-## Docker 部署
+## Docker Deployment
 
-### 基础服务与应用
+Start PostgreSQL, Redis, MinIO, API, and Web:
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml up -d --build
 ```
 
-该 Compose 包含：
-
-- PostgreSQL
-- Redis
-- MinIO
-- FastAPI
-- Next.js
-
-Milvus 使用独立 Compose 启动：
+Start Milvus separately:
 
 ```bash
 docker compose -p enterprise-rag-milvus \
   -f deploy/docker/docker-compose.milvus.yml up -d
 ```
 
-容器环境下请将 `.env` 中的连接地址改为 Compose Service 名称，例如：
+Use Compose service names inside containers:
 
 ```env
 POSTGRES_DSN=postgresql+asyncpg://rag:strong-password@postgres:5432/rag
@@ -991,25 +845,23 @@ MILVUS_URI=http://milvus-standalone:19530
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
 ```
 
-注意：两个独立 Compose 默认不一定处于同一个 Docker Network。生产使用时应合并编排文件或显式配置共享网络。
+Separate Compose projects do not automatically share a Docker network. Merge the manifests or configure an explicit shared network for production.
 
-## Kubernetes 部署
+## Kubernetes Deployment
 
-示例清单位于 `deploy/kubernetes/`：
+Example manifests are under `deploy/kubernetes/`:
 
-- `api.yaml`：FastAPI 三副本。
-- `web.yaml`：Next.js 两副本。
-- `reranker.yaml`：GPU Rerank 工作负载示例。
+- `api.yaml`: three FastAPI replicas.
+- `web.yaml`: two Next.js replicas.
+- `reranker.yaml`: GPU reranker workload example.
 
-部署前需要自行创建：
+Before deployment, create:
 
-- `rag-config` ConfigMap。
-- `rag-secrets` Secret。
-- PostgreSQL、Redis、Milvus 和对象存储服务。
-- Ingress、TLS 证书和域名。
-- 持久卷和备份策略。
-
-示例：
+- `rag-config` ConfigMap.
+- `rag-secrets` Secret.
+- PostgreSQL, Redis, Milvus, and object-storage services.
+- Ingress, TLS certificates, and DNS.
+- Persistent volumes and backup policies.
 
 ```bash
 kubectl apply -f deploy/kubernetes/api.yaml
@@ -1017,31 +869,25 @@ kubectl apply -f deploy/kubernetes/web.yaml
 kubectl apply -f deploy/kubernetes/reranker.yaml
 ```
 
-生产环境还应增加：
+Production deployments should additionally provide readiness, liveness, and startup probes; Horizontal Pod Autoscaling; PodDisruptionBudgets; NetworkPolicies; external secret management; and tested backup and restore procedures.
 
-- Readiness / Liveness Probe。
-- Horizontal Pod Autoscaler。
-- PodDisruptionBudget。
-- NetworkPolicy。
-- Secret Manager 或 External Secrets。
-- 数据库、向量库和对象存储备份。
+## Security
 
-## 安全说明
+### Files That Must Not Be Committed
 
-### 不应提交的内容
-
-以下文件和目录已被 `.gitignore` 排除：
+The following are excluded through `.gitignore`:
 
 - `.env`
-- 私钥、证书和 Secret 文件。
+- Private keys, certificates, and secret files.
+- Private design and research guidance documents.
 - `data/raw/`
 - `data/processed/`
 - `data/assets/`
 - `data/reports/`
 - `data/test-runs/`
-- IDE、缓存、构建和本地数据库文件。
+- IDE, cache, build, and local database artifacts.
 
-提交代码前建议执行：
+Before committing:
 
 ```bash
 git status --short
@@ -1049,54 +895,56 @@ git diff --check
 git grep -n "replace-with-real-secret"
 ```
 
-### 生产建议
+### Production Recommendations
 
-- 使用随机生成的 JWT、Bootstrap 和资源签名密钥。
-- 使用独立数据库账号和最小权限原则。
-- API Key 只在创建时显示一次，服务端仅保存哈希。
-- 为 PostgreSQL、Redis、Milvus 和 MinIO 开启认证与网络隔离。
-- 使用 HTTPS。
-- 限制上传文件大小和允许的扩展名。
-- 为模型网关补充超时、重试、熔断和降级策略。
-- 定期轮换所有外部服务密钥。
-- 不要将真实内部文档、评测集或用户反馈提交到公开仓库。
+- Generate unique JWT, bootstrap, and asset-signing secrets.
+- Use dedicated database accounts with least privilege.
+- Display API keys only once and store only hashes server-side.
+- Enable authentication and network isolation for PostgreSQL, Redis, Milvus, and MinIO.
+- Use HTTPS everywhere.
+- Restrict upload size and permitted extensions.
+- Add timeouts, retry budgets, circuit breakers, and fallbacks to all model-gateway calls.
+- Rotate external credentials regularly.
+- Never publish real internal documents, evaluation sets, feedback, or user data.
+- Replace browser localStorage tokens with secure HttpOnly cookies before public deployment.
 
-## 当前边界
+## Current Limitations
 
-当前代码已经实现完整 MVP 主链路，但以下能力仍需要根据生产环境补充：
+The primary MVP workflow is operational, but production deployment still requires:
 
-- 文档列表、详情、删除、版本更新及向量同步删除接口。
-- 大文件异步入库任务、任务进度和失败重试队列。
-- SSE 或 WebSocket 流式回答。
-- 会话列表和管理后台。
-- MinIO 多副本部署的完整验收。
-- PostgreSQL 正式版本化迁移工具。
-- 模型网关熔断、降级和全链路重试策略。
-- 完整 Grafana Dashboard 和告警规则。
-- CI/CD、镜像签名、自动回滚和灾备演练。
-- 基于线上反馈自动构建 Bad Case 评测集。
+- Versioned PostgreSQL migrations and rollback procedures.
+- Real dependency-aware readiness and liveness checks.
+- Asynchronous ingestion jobs for large files, progress tracking, retries, and dead-letter handling.
+- Full document list, version update, deletion, and synchronized vector deletion APIs.
+- Validated multi-replica MinIO or shared object storage.
+- Unified model-gateway resilience and request concurrency budgets.
+- Complete Grafana dashboards and alert rules.
+- CI/CD, image scanning and signing, automated rollback, and disaster-recovery exercises.
+- Load tests for concurrency, P95/P99 latency, connection-pool saturation, and degraded dependencies.
+- Automated bad-case evaluation-set generation from anonymized feedback.
 
-## 开发约定
+## Development Conventions
 
-- Python 版本范围：`>=3.11,<3.13`。
-- 保持组件依赖通过协议和 Container 注入，不在业务逻辑中直接创建基础设施连接。
-- 新增 Provider 时同时更新：
-  - `rag_core/config.py`
+- Python version: `>=3.11,<3.13`.
+- Run Python, pytest, migration, and ingestion commands through `conda run -n RAG_E` on this project machine.
+- Inject dependencies through protocols and the application container; do not create infrastructure clients inside business logic.
+- When adding a provider, update:
+  - `packages/rag_core/src/rag_core/config.py`
   - `apps/api/app/core/container.py`
   - `.env.example`
-  - 对应单元测试
-- 修改检索策略时增加离线 Recall / MRR 对比，不仅依赖人工体验。
-- 修改 Embedding 模型或维度时创建新 Milvus Collection 并重新入库。
-- 不在代码、README、测试或提交历史中写入真实密钥和个人开发机路径。
+  - Relevant unit and integration tests
+- Compare Recall / MRR before and after retrieval changes.
+- Create a new Milvus collection and re-ingest when changing embedding model or dimensions.
+- Never write real credentials or personal machine paths into code, documentation, tests, or commit history.
 
----
-
-如需快速理解代码，建议按以下顺序阅读：
+## Recommended Reading Order
 
 1. `packages/rag_core/src/rag_core/services.py`
 2. `packages/rag_core/src/rag_core/retrieval/retriever.py`
-3. `packages/rag_core/src/rag_core/ingestion/chunker.py`
-4. `packages/rag_core/src/rag_core/infrastructure/milvus.py`
-5. `apps/api/app/core/container.py`
-6. `apps/api/app/api/routes/`
-7. `apps/web/app/page.tsx`
+3. `packages/rag_core/src/rag_core/retrieval/router.py`
+4. `packages/rag_core/src/rag_core/ingestion/chunker.py`
+5. `packages/rag_core/src/rag_core/infrastructure/milvus.py`
+6. `packages/rag_core/src/rag_core/infrastructure/postgres.py`
+7. `apps/api/app/core/container.py`
+8. `apps/api/app/api/routes/`
+9. `apps/web/app/page.tsx`

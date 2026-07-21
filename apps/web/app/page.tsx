@@ -278,6 +278,8 @@ export default function HomePage() {
   const endRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
   const programmaticScrollRef = useRef(false);
+  const answerNavigationTargetRef = useRef<number | null>(null);
+  const answerNavigationReleaseRef = useRef<number | null>(null);
   const lastScrollYRef = useRef(0);
   const touchYRef = useRef<number | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -315,6 +317,14 @@ export default function HomePage() {
       );
       if (!target) return;
       followRef.current = false;
+      answerNavigationTargetRef.current = targetIndex;
+      if (answerNavigationReleaseRef.current !== null) {
+        window.clearTimeout(answerNavigationReleaseRef.current);
+      }
+      answerNavigationReleaseRef.current = window.setTimeout(() => {
+        answerNavigationTargetRef.current = null;
+        answerNavigationReleaseRef.current = null;
+      }, 800);
       setCurrentAnswerIndex(targetIndex);
       setAnswerIndexDraft(String(targetIndex));
       target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -368,6 +378,10 @@ export default function HomePage() {
         setCurrentAnswerIndex(totalAnswers);
         return;
       }
+      if (answerNavigationTargetRef.current !== null) {
+        setCurrentAnswerIndex(answerNavigationTargetRef.current);
+        return;
+      }
       const referenceLine = 120;
       let visibleIndex = Number(anchors[0].dataset.questionIndex ?? 1);
       for (const anchor of anchors) {
@@ -393,9 +407,19 @@ export default function HomePage() {
       updateCurrentAnswer();
     };
     const onWheel = (event: WheelEvent) => {
+      answerNavigationTargetRef.current = null;
+      if (answerNavigationReleaseRef.current !== null) {
+        window.clearTimeout(answerNavigationReleaseRef.current);
+        answerNavigationReleaseRef.current = null;
+      }
       if (busy && event.deltaY < 0) followRef.current = false;
     };
     const onTouchStart = (event: TouchEvent) => {
+      answerNavigationTargetRef.current = null;
+      if (answerNavigationReleaseRef.current !== null) {
+        window.clearTimeout(answerNavigationReleaseRef.current);
+        answerNavigationReleaseRef.current = null;
+      }
       touchYRef.current = event.touches[0]?.clientY ?? null;
     };
     const onTouchMove = (event: TouchEvent) => {
@@ -454,7 +478,7 @@ export default function HomePage() {
         return;
       }
       const key = event.key.toLowerCase();
-      if (key !== "w" && key !== "s") return;
+      if ((key !== "w" && key !== "s") || event.repeat) return;
       event.preventDefault();
       const baseIndex = currentAnswerIndex || 1;
       jumpToAnswer(key === "w" ? baseIndex - 1 : baseIndex + 1);

@@ -43,7 +43,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .secondary-button:active { background: var(--parchment); }
 .text-button { padding: 0 14px; background: transparent; color: var(--muted); font-size: 14px; }
 .text-button:active { color: var(--ink); }
-.upload { cursor: pointer; }
+.upload { min-height: 38px; padding: 0 15px; cursor: pointer; font-size: 13px; }
 .upload input { display: none; }
 
 .workspace-heading { padding: 72px 0 42px; text-align: center; }
@@ -138,7 +138,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .message.assistant .avatar { background: var(--ink); color: white; }
 .message.user { grid-template-columns: minmax(0, 1fr) 112px; }
 .message.user .message-meta { grid-column: 2; grid-row: 1; flex-direction: row-reverse; justify-content: flex-start; }
-.message.user .message-body { grid-column: 1; grid-row: 1; text-align: right; }
+.message.user .message-body { grid-column: 1; grid-row: 1; min-width: 0; margin-left: 134px; text-align: right; overflow-wrap: anywhere; }
 .role { color: var(--subtle); font-size: 13px; font-weight: 600; }
 .message-body { min-width: 0; color: var(--ink); font-size: 15px; line-height: 1.65; letter-spacing: -.012em; }
 .message.user .message-body { font-size: 17px; line-height: 1.55; }
@@ -191,7 +191,7 @@ textarea:focus::placeholder { opacity: 0; }
 .loading-dot { display: block; font-size: 9px; line-height: 1; letter-spacing: .5px; }
 
 .auth-shell { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: var(--parchment); }
-.auth-stage { display: grid; width: min(1080px, 100%); min-height: min(720px, calc(100vh - 48px)); grid-template-columns: 1.15fr .85fr; overflow: hidden; border-radius: 18px; background: var(--canvas); }
+.auth-stage { display: grid; width: min(1080px, 100%); min-height: min(720px, calc(100vh - 48px)); grid-template-columns: 1.15fr .85fr; overflow: hidden; border: 1px solid rgba(255, 255, 255, .68); border-radius: 18px; background: var(--canvas); box-shadow: 0 24px 70px rgba(42, 58, 78, .2), -10px 0 30px rgba(42, 58, 78, .09), 10px 0 30px rgba(42, 58, 78, .09); }
 .auth-story { display: flex; min-height: 640px; flex-direction: column; justify-content: space-between; padding: 42px 48px; background: var(--dark); color: white; }
 .auth-story .brand-lockup { color: white; }
 .auth-story .brand-mark { background: white; color: var(--ink); }
@@ -224,7 +224,8 @@ textarea:focus::placeholder { opacity: 0; }
 }
 .auth-story-copy > p:last-child { max-width: 520px; margin: 0; color: #d2d2d7; font-size: 19px; line-height: 1.55; letter-spacing: -.015em; }
 .auth-footnote { margin: 0; color: #86868b; font-size: 12px; }
-.auth-card { display: flex; align-self: center; flex-direction: column; gap: 28px; padding: 54px 56px; }
+.auth-card { position: relative; isolation: isolate; display: flex; align-self: stretch; justify-content: center; flex-direction: column; gap: 28px; overflow: hidden; border-left: 1px solid rgba(255, 255, 255, .76); padding: 54px 56px; background: linear-gradient(135deg, rgba(255, 255, 255, .58), rgba(236, 244, 251, .34) 54%, rgba(255, 255, 255, .48)); box-shadow: inset 12px 0 30px rgba(255, 255, 255, .38), -10px 0 28px rgba(42, 58, 78, .16); backdrop-filter: saturate(190%) blur(28px); -webkit-backdrop-filter: saturate(190%) blur(28px); }
+.auth-card::before { position: absolute; z-index: -1; top: -55%; left: -28%; width: 68%; height: 210%; transform: rotate(20deg); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .7), transparent); filter: blur(12px); content: ""; opacity: .68; pointer-events: none; }
 .auth-card-heading h2 { margin: 10px 0 8px; font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 34px; font-weight: 600; line-height: 1.18; letter-spacing: -.025em; }
 .auth-help { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .auth-fields { display: grid; gap: 17px; }
@@ -250,6 +251,7 @@ textarea:focus::placeholder { opacity: 0; }
   .workspace-heading { padding: 54px 0 34px; }
   .workspace-heading h1 { font-size: 40px; }
   .message { grid-template-columns: 1fr; gap: 12px; }
+  .message.user .message-body { margin-left: 0; }
   .message-meta { position: static; }
   .auth-stage { grid-template-columns: 1fr; }
   .auth-story { min-height: 330px; padding: 34px; }
